@@ -1,78 +1,94 @@
 # rag
 
-Agentic GraphRAG over speaker-attributed Dwarkesh Podcast transcripts.
-Postgres is the canonical store; Neo4j, when it arrives, is a rebuildable projection.
-See [#1](https://github.com/walkerhughes/rag/issues/1) for the roadmap.
+An agentic GraphRAG system over speaker-attributed Dwarkesh Podcast transcripts.
 
-## Setup
+Ask questions that span episodes ("where do Sutton and Karpathy disagree about continual
+learning?") and get answers grounded in transcript passages, with citations. Postgres is
+the canonical store. Neo4j, when it arrives, is a projection that can be rebuilt from it.
+
+See [#1](https://github.com/walkerhughes/rag/issues/1) for the roadmap and
+[CLAUDE.md](CLAUDE.md) for the standards this repo is developed under.
+
+## Prerequisites
+
+- [uv](https://docs.astral.sh/uv/)
+- Docker, for the local database
+- AWS CLI and Pulumi, only if you are deploying
+
+## Quickstart
 
 ```bash
 uv sync
+make up
+uv run uvicorn apps.api.main:app --reload
+curl localhost:8000/health
 ```
 
-Set `OTEL_EXPORTER_OTLP_ENDPOINT` and `HONEYCOMB_API_KEY` in `.env` to export traces.
-Without them the app still records spans locally, so nothing needs a network to run.
+`make up` starts Postgres and migrates it to head. The API answers on port 8000.
 
-The key is passed as its own variable rather than through `OTEL_EXPORTER_OTLP_HEADERS`,
-because the SDK logs that variable's value when it fails to parse it.
+## Commands
 
-Run the API locally:
+| | |
+| --- | --- |
+| `make up` | Start Postgres and migrate to head |
+| `make down` | Stop it, keeping the data |
+| `make reset` | Discard the data and rebuild from migrations |
+| `make psql` | Open a shell on the database |
+| `make check` | Everything CI runs: format, lint, types, unit tests |
+| `make test-integration` | Tests that need the database |
+
+New migration:
 
 ```bash
-uv run uvicorn apps.api.main:app --reload
+uv run alembic revision --autogenerate -m "add episodes"
+```
+
+## Configuration
+
+Settings come from the environment, or from `.env` locally. Everything has a working
+default except the Honeycomb key.
+
+| Variable | Purpose |
+| --- | --- |
+| `DATABASE_URL` | Defaults to the docker-compose database |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | Where traces go. Unset means spans stay in-process |
+| `HONEYCOMB_API_KEY` | Sent as the `x-honeycomb-team` header |
+| `ENVIRONMENT` | Tags spans. `local` by default |
+
+The local database listens on **5433**, not 5432, so it does not collide with a Postgres
+already installed on your machine.
+
+## Layout
+
+```
+apps/api/        HTTP entrypoint
+src/             capability modules, tests beside the code
+  config.py        settings
+  observability.py tracing
+  storage/         database and migrations
+docs/evaluation/ the question classes the system claims to answer
+infra/           Pulumi program for AWS
 ```
 
 ## Deploying
 
-The stack is ECR, a two-AZ VPC, and one Fargate service behind an ALB, serving
-`/health`. Roughly $36/month, of which the load balancer and its public IPv4 addresses
-are two thirds. Postgres, Neo4j, and the ingestion worker arrive with the issues that
-need them, so nothing sits idle on the bill.
-
-State lives in `s3://rag-pulumi-state-682033482233`, encrypted by the `alias/rag-pulumi`
-KMS key. No Pulumi Cloud account is involved, so no Pulumi access token is needed.
-
-`GIT_SHA` is baked into the image and reported by `/health`, so the running revision is
-identifiable. It defaults to `unknown` when unset.
+The stack is ECR, a two-AZ VPC, and one Fargate service behind a load balancer. Roughly
+$36/month, mostly the load balancer. Deployment is manual and nothing runs today.
 
 ```bash
 export AWS_PROFILE=walker-rag-app
 export GIT_SHA=$(git rev-parse --short HEAD)
 pulumi login s3://rag-pulumi-state-682033482233
-cd infra && pulumi preview   # then: pulumi up
+cd infra && pulumi preview
 ```
 
-### Secrets
-
-No secret material is committed, and none passes through the Pulumi program or its state
-file. Pulumi creates each SSM parameter empty and ignores later changes to its value; the
-value is written separately, from a GitHub Actions secret or by hand:
+Secrets are not stored in the repository. Pulumi creates the SSM parameters empty and the
+values are written separately:
 
 ```bash
 aws ssm put-parameter --name /rag/dev/honeycomb-api-key \
   --type SecureString --overwrite --value "$HONEYCOMB_API_KEY"
 ```
 
-Secrets are injected when a task starts, so a running service picks up a new value only
-after its next deployment:
-
-```bash
-aws ecs update-service --cluster <cluster> --service <service> --force-new-deployment
-```
-
-## Checks
-
-CI runs exactly these, in this order:
-
-```bash
-uv run ruff format --check . && uv run ruff check . && uv run mypy src apps && uv run pytest --cov
-```
-
-`.claude/hooks/format.sh` runs `ruff format` on every Python file Claude edits, so the
-working tree stays formatted between check runs. It sorts imports but deliberately does
-not strip unused ones, which would delete an import written just before its first use.
-
-## Layout
-
-`src/` is the import root. Capability modules start flat and become packages when they
-grow a second file. Tests sit beside the code they cover.
+Because secrets are read when a task starts, a running service picks up a new value only
+after `aws ecs update-service --force-new-deployment`.
