@@ -1,11 +1,6 @@
 """AWS backend for the rag project.
 
-The thin slice: ECR, a VPC, and one Fargate service behind an ALB, serving /health.
-It exists so that every later phase lands on a deploy path that already works, rather
-than debugging the agent and its first deployment at the same time.
-
-Postgres, Neo4j, and the ingestion worker are deliberately absent. They arrive with the
-issues that need them (#4, #16, #6) instead of costing money while unused.
+ECR, a VPC, and one Fargate service behind an application load balancer.
 """
 
 import pulumi
@@ -19,17 +14,15 @@ otlp_endpoint = config.get("otlpEndpoint") or "https://api.honeycomb.io"
 PORT = 8000
 
 # --- network ---------------------------------------------------------------------
-# ponytail: public subnets only, so no NAT gateway (~$32/mo for this slice's whole
-# reason to exist). Tasks egress through the internet gateway. Move to private subnets
-# with VPC endpoints when the service holds real data, which is #4 at the earliest.
+# Public subnets only. Tasks egress through the internet gateway, so there is no NAT
+# gateway to pay for.
 vpc = awsx.ec2.Vpc(
     "rag",
-    # Two AZs, not the default three. Still survives an AZ failure, and every extra AZ
-    # adds a billable public IPv4 address on the load balancer.
+    # Each AZ adds a billable public IPv4 address on the load balancer.
     number_of_availability_zones=2,
     nat_gateways=awsx.ec2.NatGatewayConfigurationArgs(strategy=awsx.ec2.NatGatewayStrategy.NONE),
     subnet_specs=[awsx.ec2.SubnetSpecArgs(type=awsx.ec2.SubnetType.PUBLIC, cidr_mask=24)],
-    # Pinned because the awsx default flips to "Auto" in the next major version.
+    # Pinned because the awsx default changes in the next major version.
     subnet_strategy=awsx.ec2.SubnetAllocationStrategy.AUTO,
 )
 
@@ -49,7 +42,7 @@ alb_security_group = aws.ec2.SecurityGroup(
     ],
 )
 
-# The container is not reachable from the internet directly, only through the ALB.
+# The container accepts traffic from the load balancer only.
 task_security_group = aws.ec2.SecurityGroup(
     "task",
     vpc_id=vpc.vpc_id,
@@ -70,13 +63,10 @@ task_security_group = aws.ec2.SecurityGroup(
 )
 
 # --- secrets ---------------------------------------------------------------------
-# The Honeycomb key reaches the container through SSM, never through the task
-# definition in plaintext. Set it with:
-#   pulumi config set --secret honeycombApiKey <key>
+# Populate with: pulumi config set --secret honeycombApiKey <key>
 #
-# Stored as the bare key, not as an OTEL_EXPORTER_OTLP_HEADERS string. The SDK parses
-# that variable at startup and logs the value it failed to parse, which would put the
-# key into CloudWatch. observability.py builds the header itself instead.
+# Held as the bare key rather than an OTEL_EXPORTER_OTLP_HEADERS string, whose value the
+# OpenTelemetry SDK writes to the log when it cannot parse it.
 honeycomb_key_parameter = aws.ssm.Parameter(
     "honeycomb-api-key",
     type="SecureString",
@@ -84,7 +74,7 @@ honeycomb_key_parameter = aws.ssm.Parameter(
 )
 
 # --- image -----------------------------------------------------------------------
-# Tagged by content hash, so a given tag always refers to the same bits.
+# Tagged by content hash, so a tag always refers to the same image.
 repository = awsx.ecr.Repository(
     "rag",
     force_delete=True,
@@ -142,7 +132,7 @@ assume_by_ecs = aws.iam.get_policy_document(
     ]
 ).json
 
-# Pulls the image and reads the one SSM parameter. Nothing else.
+# Pulls the image and reads the one SSM parameter below.
 execution_role = aws.iam.Role("execution", assume_role_policy=assume_by_ecs)
 
 aws.iam.RolePolicyAttachment(
@@ -167,8 +157,7 @@ aws.iam.RolePolicy(
     ),
 )
 
-# The application's own role. It has no policies because the app calls no AWS APIs yet;
-# grants arrive with the services that need them.
+# The application's own role. No policies attached: the app calls no AWS APIs.
 task_role = aws.iam.Role("task", assume_role_policy=assume_by_ecs)
 
 # --- service ---------------------------------------------------------------------
@@ -181,7 +170,7 @@ service = awsx.ecs.FargateService(
     network_configuration=aws.ecs.ServiceNetworkConfigurationArgs(
         subnets=vpc.public_subnet_ids,
         security_groups=[task_security_group.id],
-        assign_public_ip=True,  # required to pull the image without a NAT gateway
+        assign_public_ip=True,  # needed to reach ECR without a NAT gateway
     ),
     task_definition_args=awsx.ecs.FargateServiceTaskDefinitionArgs(
         cpu="256",

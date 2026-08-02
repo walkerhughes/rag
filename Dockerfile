@@ -3,8 +3,8 @@ FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim
 
 WORKDIR /app
 
-# Dependencies resolve from the lockfile in their own layer, so application edits do not
-# reinstall them. --frozen fails the build if the lockfile drifts from pyproject.toml.
+# Dependencies install in their own layer so application edits do not reinstall them.
+# --frozen fails the build if the lockfile and pyproject.toml disagree.
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 

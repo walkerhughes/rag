@@ -1,8 +1,7 @@
 # Machine-readable question-class metadata. Read with stdlib tomllib.
 #
-# Floors are PROVISIONAL. They were written before any retrieval existed, so they are
-# targets, not measurements. Issue #9 replaces them with numbers taken from the baseline
-# report. Do not treat a provisional floor as evidence that a capability works.
+# The floors are provisional targets, written before any retrieval existed. They are not
+# measurements and do not show that a capability works.
 
 [defaults]
 recall_at_10 = 0.80
@@ -32,7 +31,6 @@ summary = "Contrast what two named speakers said about the same topic."
 graph_expected = false
 rationale = """
 Speaker is a column on every chunk, so this is a metadata-filtered retrieval problem.
-Listed as a graph candidate only if filtered retrieval measurably fails in #9.
 """
 recall_at_10 = 0.75
 metadata_filter_accuracy = 0.95

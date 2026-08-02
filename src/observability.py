@@ -1,13 +1,7 @@
 """Tracing setup shared by every app and worker.
 
 Call `configure_tracing()` once at process start; import `tracer` anywhere.
-The endpoint comes from `OTEL_EXPORTER_OTLP_ENDPOINT`, which the SDK reads itself.
-
-Auth headers are built here from the API key rather than passed through
-`OTEL_EXPORTER_OTLP_HEADERS`. That variable is a plain string the SDK parses at startup,
-and on a malformed value it logs the string it failed to parse, which puts the key in
-stdout and from there into CloudWatch. Passing the key as its own variable removes both
-the parsing step and the log line.
+The exporter endpoint is read from OTEL_EXPORTER_OTLP_ENDPOINT by the SDK.
 """
 
 import os
@@ -20,12 +14,12 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 from config import settings
 
-# Resolves lazily, so importing this before configure_tracing() runs is safe.
+# A lazy proxy, so importing this before configure_tracing() runs is safe.
 tracer = trace.get_tracer("rag")
 
 
 def configure_tracing() -> None:
-    """Idempotent. Records spans locally; exports only if an endpoint and key are set."""
+    """Idempotent. Records spans locally; exports only when an endpoint and key are set."""
     if isinstance(trace.get_tracer_provider(), TracerProvider):
         return
 
@@ -33,6 +27,8 @@ def configure_tracing() -> None:
         resource=Resource.create({"deployment.environment": settings.environment})
     )
     if os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT") and settings.honeycomb_api_key:
+        # Built here rather than passed via OTEL_EXPORTER_OTLP_HEADERS, whose value the
+        # SDK writes to the log when it cannot parse it.
         exporter = OTLPSpanExporter(
             headers={"x-honeycomb-team": settings.honeycomb_api_key.get_secret_value()}
         )
