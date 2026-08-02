@@ -1,0 +1,72 @@
+# Machine-readable question-class metadata. Read with stdlib tomllib.
+#
+# Floors are PROVISIONAL. They were written before any retrieval existed, so they are
+# targets, not measurements. Issue #9 replaces them with numbers taken from the baseline
+# report. Do not treat a provisional floor as evidence that a capability works.
+
+[defaults]
+recall_at_10 = 0.80
+groundedness = 0.95
+citation_precision = 0.90
+p95_latency_seconds = 12.0
+max_cost_usd_per_query = 0.15
+
+[classes.direct_retrieval]
+summary = "A single passage in a single episode answers the question."
+graph_expected = false
+rationale = "Lexical or vector search over chunks is sufficient. This is the control group."
+recall_at_10 = 0.90
+p95_latency_seconds = 6.0
+
+[classes.cross_episode_synthesis]
+summary = "The answer requires combining passages from two or more episodes."
+graph_expected = false
+rationale = """
+Hybrid retrieval with a high enough k should surface the passages. If it does not, the
+failure is a retrieval-breadth problem before it is a graph problem.
+"""
+recall_at_10 = 0.75
+
+[classes.speaker_comparison]
+summary = "Contrast what two named speakers said about the same topic."
+graph_expected = false
+rationale = """
+Speaker is a column on every chunk, so this is a metadata-filtered retrieval problem.
+Listed as a graph candidate only if filtered retrieval measurably fails in #9.
+"""
+recall_at_10 = 0.75
+metadata_filter_accuracy = 0.95
+
+[classes.topic_evolution]
+summary = "How a speaker's or the corpus's position on a topic changed over time."
+graph_expected = true
+rationale = """
+Needs topic identity to survive paraphrase across episodes, plus publication-date
+ordering. Vector similarity finds related passages but does not establish that two
+passages are about the same canonical topic, which is what the ordering depends on.
+"""
+recall_at_10 = 0.70
+p95_latency_seconds = 20.0
+
+[classes.agreement_disagreement]
+summary = "Which speakers agree or disagree on a claim, and on what grounds."
+graph_expected = true
+rationale = """
+Requires typed claim extraction and a stance relation between speaker and claim.
+Retrieval alone returns passages near a topic without establishing who contradicts whom.
+"""
+recall_at_10 = 0.70
+groundedness = 0.97
+p95_latency_seconds = 20.0
+
+[classes.bounded_multi_hop]
+summary = "Answer requires traversing two or three typed relationships."
+graph_expected = true
+rationale = """
+The intermediate entity is often never named in the question, so no single query embeds
+near the answer passage. This is the clearest case for bounded traversal.
+"""
+recall_at_10 = 0.65
+p95_latency_seconds = 25.0
+max_cost_usd_per_query = 0.30
+max_traversal_depth = 3
