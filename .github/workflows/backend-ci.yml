@@ -14,8 +14,8 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync
-      # Same four commands documented in the README, in the same order.
+      # The same four commands the README documents, in the same order.
       - run: uv run ruff format --check .
       - run: uv run ruff check .
-      - run: uv run mypy src
+      - run: uv run mypy src apps
       - run: uv run pytest --cov

@@ -4,15 +4,17 @@ version = "0.1.0"
 description = "Agentic GraphRAG over speaker-attributed Dwarkesh Podcast transcripts"
 readme = "README.md"
 requires-python = ">=3.13"
-# Instrumentation packages arrive with the library they instrument, not before it:
-# psycopg with #4, an HTTP client with #6, ASGI with #10. `opentelemetry-distro` is
-# deliberately absent because it exists for zero-code `opentelemetry-instrument`
-# startup, and observability.py configures the SDK explicitly instead.
+# Each OpenTelemetry instrumentation package is added alongside the library it
+# instruments. `opentelemetry-distro` is not used: it serves zero-code startup through
+# the `opentelemetry-instrument` wrapper, and observability.py configures the SDK.
 dependencies = [
     "pydantic>=2.10",
     "pydantic-settings>=2.7",
     "opentelemetry-sdk>=1.44.0",
     "opentelemetry-exporter-otlp-proto-http>=1.44.0",
+    "opentelemetry-instrumentation-fastapi>=0.65b0",
+    "fastapi>=0.115",
+    "uvicorn>=0.34",
 ]
 
 [dependency-groups]
@@ -23,8 +25,8 @@ dev = [
     "ruff>=0.9",
 ]
 
-# ponytail: application, not a library. Nothing here installs into site-packages, so `src`
-# is simply the import root. Revisit if a capability ever needs to ship standalone.
+# An application rather than a library: nothing installs into site-packages, and `src`
+# is the import root.
 [tool.uv]
 package = false
 

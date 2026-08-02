@@ -1,8 +1,4 @@
-"""Guards the evaluation contract in docs/evaluation/.
-
-This is what makes the contract machine-readable rather than merely written down:
-if an example drifts from a declared class, or a class loses a split, CI fails.
-"""
+"""Checks that the evaluation contract in docs/evaluation/ stays internally consistent."""
 
 import json
 import tomllib
@@ -37,7 +33,7 @@ def test_every_example_matches_a_declared_class() -> None:
 
 
 def test_every_class_has_both_splits() -> None:
-    """Acceptance criterion from #2: no claimed capability without held-out examples."""
+    """No question class is claimed without both development and held-out examples."""
     examples = load_examples()
     for name in load_classes():
         splits = {e["split"] for e in examples if e["question_class"] == name}
