@@ -1,4 +1,4 @@
-.PHONY: up down reset logs psql preview ingest check test test-integration
+.PHONY: up down reset logs psql preview ingest reindex check test test-integration
 
 # Starts Postgres, waits for it to pass its healthcheck, and migrates it to head.
 up:
@@ -30,6 +30,10 @@ preview:
 # Ingests recent episodes from dwarkesh.com. Pass SLUG=<slug> for one episode.
 ingest: up
 	PYTHONPATH=src uv run python -m apps.ingestion_worker.main $(if $(SLUG),--slug $(SLUG),--limit $(LIMIT))
+
+# Rebuilds chunks for every stored episode. Fetches nothing.
+reindex: up
+	PYTHONPATH=src uv run python -m apps.ingestion_worker.main --reindex
 
 # The same commands CI runs, in the same order.
 check:

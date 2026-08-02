@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from corpus.models import Episode as DomainEpisode
 from corpus.models import IngestionStatus
+from retrieval.chunking import CHUNKER_VERSION, Chunk
 from storage.postgres import models
 
 
@@ -112,3 +113,46 @@ def save_episode(session: Session, run: models.IngestionRun, episode: DomainEpis
     )
     session.flush()
     return episode_id
+
+
+def save_chunks(session: Session, episode_id: uuid.UUID, chunks: list[Chunk]) -> None:
+    """Replaces an episode's chunks, keeping identifiers where the boundaries are unchanged."""
+    if chunks:
+        statement = insert(models.Chunk).values(
+            [
+                {
+                    "id": uuid.uuid4(),
+                    "episode_id": episode_id,
+                    "ordinal": chunk.ordinal,
+                    "first_position": chunk.first_position,
+                    "last_position": chunk.last_position,
+                    "speakers": chunk.speakers,
+                    "text": chunk.text,
+                    "start": chunk.start,
+                    "chunker_version": CHUNKER_VERSION,
+                }
+                for chunk in chunks
+            ]
+        )
+        session.execute(
+            statement.on_conflict_do_update(
+                constraint="chunk_ordinal_unique",
+                set_={
+                    "first_position": statement.excluded.first_position,
+                    "last_position": statement.excluded.last_position,
+                    "speakers": statement.excluded.speakers,
+                    "text": statement.excluded.text,
+                    "start": statement.excluded.start,
+                    "chunker_version": statement.excluded.chunker_version,
+                },
+            )
+        )
+
+    # Fewer chunks than last time leaves stale ones at the end.
+    session.execute(
+        delete(models.Chunk).where(
+            models.Chunk.episode_id == episode_id,
+            models.Chunk.ordinal >= len(chunks),
+        )
+    )
+    session.flush()

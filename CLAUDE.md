@@ -58,6 +58,25 @@ The archive's `type` field is not a reliable indicator that a post has a transcr
 essays are published as podcasts. A page that yields no speaker turns is quarantined
 rather than stored empty.
 
+## Retrieval
+
+Chunks pack consecutive turns toward two hundred words and split a longer turn at
+sentence boundaries, because a turn is the wrong unit on its own: a quarter of real turns
+are under twenty words and a tenth run past three hundred. Chunks never cross episodes,
+and each records the range of turns it covers so a passage resolves back to its speaker
+and position.
+
+Every strategy returns `Evidence`, so results from different strategies can be compared
+and cited the same way.
+
+Full-text queries match any of a question's terms, not all of them. Requiring every term
+makes a natural-language question unmatchable, which reads as a retrieval failure when it
+is really a query-construction bug. Ranked results break ties on identifier so that
+repeating a query returns the same order.
+
+Changing the chunking rules means changing `CHUNKER_VERSION` and re-chunking, since
+anything derived from a chunk is invalidated by new boundaries.
+
 ## Observability
 
 Honeycomb environments are deployment stages, and datasets are services. The environment

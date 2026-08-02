@@ -8,6 +8,7 @@ from collections.abc import Sequence
 from corpus.ingestion.dwarkesh import client, pipeline
 from corpus.models import Episode
 from observability import configure_tracing, tracer
+from retrieval.indexing import index_all
 from storage.postgres import session
 
 ARCHIVE_SEARCH_DEPTH = 200
@@ -68,6 +69,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     arguments.add_argument("--limit", type=int, default=5, help="how many recent episodes")
     arguments.add_argument("--slug", action="append", help="ingest one episode; repeatable")
     arguments.add_argument(
+        "--reindex",
+        action="store_true",
+        help="re-chunk every stored episode, fetching nothing",
+    )
+    arguments.add_argument(
         "--dry-run",
         action="store_true",
         help="fetch and parse only, writing nothing and needing no database",
@@ -77,6 +83,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     configure_tracing("rag-ingestion")
     with tracer.start_as_current_span("ingestion_worker") as span:
         span.set_attribute("ingestion.dry_run", parsed.dry_run)
+
+        if parsed.reindex:
+            with session() as active:
+                chunks = index_all(active)
+            print(f"re-chunked {chunks} chunks")
+            return 0
+
         listings = select(parsed.limit, parsed.slug)
 
         if parsed.dry_run:

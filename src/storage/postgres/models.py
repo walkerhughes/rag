@@ -9,16 +9,19 @@ from datetime import date, datetime, timedelta
 
 from sqlalchemy import (
     CheckConstraint,
+    Computed,
     Date,
     DateTime,
     ForeignKey,
+    Index,
+    Integer,
     Interval,
     String,
     Text,
     UniqueConstraint,
     func,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import ARRAY, TSVECTOR, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from storage.postgres import Base
@@ -108,4 +111,36 @@ class TranscriptSegment(Base):
     __table_args__ = (
         UniqueConstraint("episode_id", "position", name="transcript_segment_position_unique"),
         CheckConstraint("position >= 0", name="transcript_segment_position_non_negative"),
+    )
+
+
+class Chunk(Base):
+    """A retrieval unit covering a contiguous range of one episode's turns."""
+
+    __tablename__ = "chunk"
+
+    id: Mapped[uuid.UUID] = _uuid_column()
+    episode_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("episode.id", ondelete="CASCADE"), index=True
+    )
+    ordinal: Mapped[int] = mapped_column(Integer)
+    first_position: Mapped[int] = mapped_column(Integer)
+    last_position: Mapped[int] = mapped_column(Integer)
+    # Denormalised from the turns this chunk covers, so filtering needs no join.
+    speakers: Mapped[list[str]] = mapped_column(ARRAY(String(200)))
+    text: Mapped[str] = mapped_column(Text)
+    start: Mapped[timedelta | None] = mapped_column(Interval)
+    # Which chunking rules produced this row, so a change of rules is detectable.
+    chunker_version: Mapped[str] = mapped_column(String(16))
+    # Maintained by Postgres, so the text and its index cannot drift apart.
+    search: Mapped[str] = mapped_column(
+        TSVECTOR, Computed("to_tsvector('english', text)", persisted=True)
+    )
+
+    __table_args__ = (
+        UniqueConstraint("episode_id", "ordinal", name="chunk_ordinal_unique"),
+        CheckConstraint("first_position <= last_position", name="chunk_positions_ordered"),
+        CheckConstraint("first_position >= 0", name="chunk_first_position_non_negative"),
+        Index("ix_chunk_search", "search", postgresql_using="gin"),
+        Index("ix_chunk_speakers", "speakers", postgresql_using="gin"),
     )

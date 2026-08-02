@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from corpus.ingestion.dwarkesh import client, parser
 from corpus.models import Episode, IngestionStatus
 from observability import tracer
+from retrieval.indexing import index_episode
 from storage.postgres import models, repositories
 
 SOURCE = "dwarkesh"
@@ -66,7 +67,9 @@ def ingest_episode(
     with tracer.start_as_current_span("episode.persist") as span:
         episode_id = repositories.save_episode(session, run, episode)
         span.set_attribute("episode.id", str(episode_id))
-        return episode_id
+
+    index_episode(session, episode_id)
+    return episode_id
 
 
 def ingest(session: Session, listings: list[client.EpisodeListing]) -> Result:
