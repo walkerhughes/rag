@@ -73,10 +73,14 @@ task_security_group = aws.ec2.SecurityGroup(
 # The Honeycomb key reaches the container through SSM, never through the task
 # definition in plaintext. Set it with:
 #   pulumi config set --secret honeycombApiKey <key>
-otlp_headers = aws.ssm.Parameter(
-    "otlp-headers",
+#
+# Stored as the bare key, not as an OTEL_EXPORTER_OTLP_HEADERS string. The SDK parses
+# that variable at startup and logs the value it failed to parse, which would put the
+# key into CloudWatch. observability.py builds the header itself instead.
+honeycomb_key_parameter = aws.ssm.Parameter(
+    "honeycomb-api-key",
     type="SecureString",
-    value=honeycomb_api_key.apply(lambda key: f"x-honeycomb-team={key}"),
+    value=honeycomb_api_key,
 )
 
 # --- image -----------------------------------------------------------------------
@@ -150,7 +154,7 @@ aws.iam.RolePolicyAttachment(
 aws.iam.RolePolicy(
     "execution-ssm",
     role=execution_role.id,
-    policy=otlp_headers.arn.apply(
+    policy=honeycomb_key_parameter.arn.apply(
         lambda arn: (
             aws.iam.get_policy_document(
                 statements=[
@@ -208,7 +212,7 @@ service = awsx.ecs.FargateService(
             ],
             secrets=[
                 awsx.ecs.TaskDefinitionSecretArgs(
-                    name="OTEL_EXPORTER_OTLP_HEADERS", value_from=otlp_headers.arn
+                    name="HONEYCOMB_API_KEY", value_from=honeycomb_key_parameter.arn
                 )
             ],
         ),

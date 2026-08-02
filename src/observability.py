@@ -1,7 +1,13 @@
 """Tracing setup shared by every app and worker.
 
 Call `configure_tracing()` once at process start; import `tracer` anywhere.
-`OTEL_SERVICE_NAME` and the `OTEL_EXPORTER_OTLP_*` settings are read by the SDK itself.
+The endpoint comes from `OTEL_EXPORTER_OTLP_ENDPOINT`, which the SDK reads itself.
+
+Auth headers are built here from the API key rather than passed through
+`OTEL_EXPORTER_OTLP_HEADERS`. That variable is a plain string the SDK parses at startup,
+and on a malformed value it logs the string it failed to parse, which puts the key in
+stdout and from there into CloudWatch. Passing the key as its own variable removes both
+the parsing step and the log line.
 """
 
 import os
@@ -19,13 +25,16 @@ tracer = trace.get_tracer("rag")
 
 
 def configure_tracing() -> None:
-    """Idempotent. Records spans locally; exports only if an OTLP endpoint is set."""
+    """Idempotent. Records spans locally; exports only if an endpoint and key are set."""
     if isinstance(trace.get_tracer_provider(), TracerProvider):
         return
 
     provider = TracerProvider(
         resource=Resource.create({"deployment.environment": settings.environment})
     )
-    if os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT"):
-        provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
+    if os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT") and settings.honeycomb_api_key:
+        exporter = OTLPSpanExporter(
+            headers={"x-honeycomb-team": settings.honeycomb_api_key.get_secret_value()}
+        )
+        provider.add_span_processor(BatchSpanProcessor(exporter))
     trace.set_tracer_provider(provider)
