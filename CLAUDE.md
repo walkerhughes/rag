@@ -48,6 +48,28 @@ not the normal way to undo a change.
 single migration must never break the version currently running. Add a column, deploy code
 that writes it, backfill, then drop the old one in a later migration.
 
+## Observability
+
+Honeycomb environments are deployment stages, and datasets are services. The environment
+is selected by the ingest key, the dataset by `service.name`.
+
+| | Selected by | Values |
+| --- | --- | --- |
+| Environment | the ingest API key | `dev`, `prod`, later `ci` |
+| Dataset | `service.name` | `rag-api`, `rag-ingestion` |
+
+Do not give a component its own environment. Traces cannot span environments, and the
+services here share a database and libraries, so a component split would cut traces in
+half. Filter on `service.name` for component isolation instead.
+
+Every app names itself in `configure_tracing()`. Spans carry `service.version` from the
+commit and `deployment.environment.name` from the stack, so a trace identifies both what
+ran and which build produced it. Keys are per stack, in
+`/rag/<stack>/honeycomb-api-key`, so a new stack reaches a new environment on its own.
+
+CI does not export telemetry. The unit job needs no network, and every run would spend
+events against the quota.
+
 ## Secrets
 
 No secret material belongs in the repository, the Pulumi program, or its state file.

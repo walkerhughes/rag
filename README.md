@@ -53,8 +53,9 @@ default except the Honeycomb key.
 | --- | --- |
 | `DATABASE_URL` | Defaults to the docker-compose database |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Where traces go. Unset means spans stay in-process |
-| `HONEYCOMB_API_KEY` | Sent as the `x-honeycomb-team` header |
-| `ENVIRONMENT` | Tags spans. `local` by default |
+| `HONEYCOMB_API_KEY` | Sent as `x-honeycomb-team`. The key picks the Honeycomb environment |
+| `ENVIRONMENT` | Tags spans as `deployment.environment.name`. `local` by default |
+| `GIT_SHA` | Tags spans as `service.version`. Baked in at image build |
 
 The local database listens on **5433**, not 5432, so it does not collide with a Postgres
 already installed on your machine.
