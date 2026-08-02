@@ -8,8 +8,8 @@ import pulumi_aws as aws
 import pulumi_awsx as awsx
 
 config = pulumi.Config()
-honeycomb_api_key = config.require_secret("honeycombApiKey")
 otlp_endpoint = config.get("otlpEndpoint") or "https://api.honeycomb.io"
+STACK = pulumi.get_stack()
 
 PORT = 8000
 
@@ -63,14 +63,17 @@ task_security_group = aws.ec2.SecurityGroup(
 )
 
 # --- secrets ---------------------------------------------------------------------
-# Populate with: pulumi config set --secret honeycombApiKey <key>
+# Created empty. The value is written separately, so no secret material passes through
+# this program, its state file, or the repository. See the deploy section of README.md.
 #
-# Held as the bare key rather than an OTEL_EXPORTER_OTLP_HEADERS string, whose value the
+# Holds the bare key rather than an OTEL_EXPORTER_OTLP_HEADERS string, whose value the
 # OpenTelemetry SDK writes to the log when it cannot parse it.
 honeycomb_key_parameter = aws.ssm.Parameter(
     "honeycomb-api-key",
+    name=f"/rag/{STACK}/honeycomb-api-key",
     type="SecureString",
-    value=honeycomb_api_key,
+    value="unset",
+    opts=pulumi.ResourceOptions(ignore_changes=["value"]),
 )
 
 # --- image -----------------------------------------------------------------------

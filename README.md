@@ -29,20 +29,31 @@ The stack is ECR, a two-AZ VPC, and one Fargate service behind an ALB, serving
 are two thirds. Postgres, Neo4j, and the ingestion worker arrive with the issues that
 need them, so nothing sits idle on the bill.
 
-State lives in `s3://rag-pulumi-state-682033482233`, with stack secrets encrypted by the
-`alias/rag-pulumi` KMS key. No Pulumi Cloud account is involved.
+State lives in `s3://rag-pulumi-state-682033482233`, encrypted by the `alias/rag-pulumi`
+KMS key. No Pulumi Cloud account is involved, so no Pulumi access token is needed.
 
 ```bash
 export AWS_PROFILE=walker-rag-app
 pulumi login s3://rag-pulumi-state-682033482233
-cd infra && pulumi up
+cd infra && pulumi preview   # then: pulumi up
 ```
 
-`pulumi config set --secret honeycombApiKey <key>` seeds the key into SSM. Check what a
-change would do before making it:
+### Secrets
+
+No secret material is committed, and none passes through the Pulumi program or its state
+file. Pulumi creates each SSM parameter empty and ignores later changes to its value; the
+value is written separately, from a GitHub Actions secret or by hand:
 
 ```bash
-cd infra && pulumi preview
+aws ssm put-parameter --name /rag/dev/honeycomb-api-key \
+  --type SecureString --overwrite --value "$HONEYCOMB_API_KEY"
+```
+
+Secrets are injected when a task starts, so a running service picks up a new value only
+after its next deployment:
+
+```bash
+aws ecs update-service --cluster <cluster> --service <service> --force-new-deployment
 ```
 
 ## Checks

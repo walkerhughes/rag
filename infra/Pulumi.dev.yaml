@@ -3,5 +3,3 @@ encryptedkey: AQICAHgpkF8raK9xv/ip2rAyvZVW3gPszeDX5uwRQb3Y/ds4LwFXyKzhDxy1c3ywen
 config:
   aws:region: us-east-1
   aws:profile: walker-rag-app
-  rag:honeycombApiKey:
-    secure: v1:xhEbVcOdFHmbhcNY:myJFEYq6xAPQbhHo2wnhwklbVkSObrC+TsWuyT/JK1Nu2MIsDv4=
