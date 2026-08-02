@@ -1,45 +1,20 @@
 """Pipeline tests against a real database, with fetching stubbed so no network is used."""
 
-from collections.abc import Iterator
 from datetime import date
 from pathlib import Path
 
 import pytest
-from alembic import command
-from alembic.config import Config
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from corpus.ingestion.dwarkesh import client, pipeline
 from corpus.models import IngestionStatus
-from storage.postgres import Base, engine, models
+from storage.postgres import models
 
 pytestmark = pytest.mark.integration
 
 FIXTURES = Path(__file__).parent / "fixtures"
 REPO_ROOT = Path(__file__).parents[4]
-
-
-@pytest.fixture(scope="module", autouse=True)
-def schema_at_head() -> None:
-    command.upgrade(Config(str(REPO_ROOT / "alembic.ini")), "head")
-
-
-@pytest.fixture
-def session() -> Iterator[Session]:
-    with Session(engine) as active:
-        yield active
-        active.rollback()
-    with Session(engine) as cleanup:
-        for table in (
-            "transcript_segment",
-            "episode_speaker",
-            "episode",
-            "speaker",
-            "ingestion_run",
-        ):
-            cleanup.execute(Base.metadata.tables[table].delete())
-        cleanup.commit()
 
 
 def listing(slug: str = "richard-sutton") -> client.EpisodeListing:
