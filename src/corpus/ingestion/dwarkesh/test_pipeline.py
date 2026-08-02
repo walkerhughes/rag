@@ -1,7 +1,7 @@
 """Pipeline tests against a real database, with fetching stubbed so no network is used."""
 
+from collections.abc import Callable
 from datetime import date
-from pathlib import Path
 
 import pytest
 from sqlalchemy import func, select
@@ -13,38 +13,16 @@ from storage.postgres import models
 
 pytestmark = pytest.mark.integration
 
-FIXTURES = Path(__file__).parent / "fixtures"
-REPO_ROOT = Path(__file__).parents[4]
-
-
-def listing(slug: str = "richard-sutton") -> client.EpisodeListing:
-    return client.EpisodeListing(
-        slug=slug,
-        title="Richard Sutton",
-        canonical_url=f"https://www.dwarkesh.com/p/{slug}",
-        post_date=date(2025, 9, 26),
-        type="podcast",
-    )
-
-
-@pytest.fixture
-def offline(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Serves the committed fixture for known slugs and fails for anything else."""
-
-    def fetch_page(slug: str) -> str:
-        path = FIXTURES / f"{slug}.html"
-        if not path.exists():
-            raise client.FetchError(f"{slug}: not found")
-        return path.read_text()
-
-    monkeypatch.setattr(client, "fetch_page", fetch_page)
+Listing = Callable[..., client.EpisodeListing]
 
 
 def count(session: Session, model: type) -> int:
     return session.execute(select(func.count()).select_from(model)).scalar_one()
 
 
-def test_an_episode_is_ingested_with_its_transcript(session: Session, offline: None) -> None:
+def test_an_episode_is_ingested_with_its_transcript(
+    session: Session, offline: None, listing: Listing
+) -> None:
     result = pipeline.ingest(session, [listing()])
 
     assert result.ingested == ["richard-sutton"]
@@ -73,7 +51,9 @@ def test_an_episode_is_ingested_with_its_transcript(session: Session, offline: N
     assert all(segment.ingestion_run_id == run.id for segment in segments)
 
 
-def test_ingesting_the_same_episode_twice_changes_nothing(session: Session, offline: None) -> None:
+def test_ingesting_the_same_episode_twice_changes_nothing(
+    session: Session, offline: None, listing: Listing
+) -> None:
     pipeline.ingest(session, [listing()])
     first = count(session, models.TranscriptSegment)
 
@@ -85,7 +65,7 @@ def test_ingesting_the_same_episode_twice_changes_nothing(session: Session, offl
 
 
 def test_an_unfetchable_episode_is_quarantined_and_the_others_still_land(
-    session: Session, offline: None
+    session: Session, offline: None, listing: Listing
 ) -> None:
     result = pipeline.ingest(session, [listing("missing-episode"), listing()])
 
@@ -101,7 +81,7 @@ def test_an_unfetchable_episode_is_quarantined_and_the_others_still_land(
 
 
 def test_a_run_where_everything_fails_is_recorded_as_failed(
-    session: Session, offline: None
+    session: Session, offline: None, listing: Listing
 ) -> None:
     result = pipeline.ingest(session, [listing("missing-episode")])
 
@@ -114,7 +94,7 @@ def test_a_run_where_everything_fails_is_recorded_as_failed(
 
 
 def test_a_page_with_no_transcript_leaves_no_partial_episode(
-    session: Session, monkeypatch: pytest.MonkeyPatch
+    session: Session, monkeypatch: pytest.MonkeyPatch, listing: Listing
 ) -> None:
     """A parse failure must not leave the episode row behind without its transcript."""
     monkeypatch.setattr(

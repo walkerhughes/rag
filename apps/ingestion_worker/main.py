@@ -2,6 +2,7 @@
 
 import argparse
 import sys
+import textwrap
 from collections.abc import Sequence
 
 from corpus.ingestion.dwarkesh import client, pipeline
@@ -10,7 +11,7 @@ from observability import configure_tracing, tracer
 from storage.postgres import session
 
 ARCHIVE_SEARCH_DEPTH = 200
-PREVIEW_CHARACTERS = 100
+EXCERPT = 100
 
 
 def select(limit: int, slugs: list[str] | None) -> list[client.EpisodeListing]:
@@ -35,9 +36,6 @@ def describe(episode: Episode) -> str:
     timed = sum(1 for segment in segments if segment.start is not None)
     longest = max(segments, key=lambda segment: len(segment.text))
 
-    def excerpt(text: str) -> str:
-        return text[:PREVIEW_CHARACTERS] + ("..." if len(text) > PREVIEW_CHARACTERS else "")
-
     return "\n".join(
         [
             f"{episode.source_id}  {episode.published_at}",
@@ -47,8 +45,8 @@ def describe(episode: Episode) -> str:
             f"  words      {words}",
             f"  timestamps {timed}/{len(segments)}",
             f"  longest    {len(longest.text)} chars, {longest.speaker}",
-            f"  first      {segments[0].speaker}: {excerpt(segments[0].text)}",
-            f"  last       {segments[-1].speaker}: {excerpt(segments[-1].text)}",
+            f"  first      {segments[0].speaker}: {textwrap.shorten(segments[0].text, EXCERPT)}",
+            f"  last       {segments[-1].speaker}: {textwrap.shorten(segments[-1].text, EXCERPT)}",
         ]
     )
 

@@ -11,7 +11,6 @@ ARCHIVE_URL = "https://www.dwarkesh.com/api/v1/archive"
 POST_URL = "https://www.dwarkesh.com/p/{slug}"
 USER_AGENT = "rag-ingestion/0.1 (+https://github.com/walkerhughes/rag)"
 TIMEOUT_SECONDS = 30
-PODCAST = "podcast"
 # The archive endpoint rejects larger pages, and truncates responses well below its own
 # limit, so pagination follows the delivered count rather than this one.
 PAGE_SIZE = 50
@@ -42,7 +41,7 @@ class EpisodeListing(BaseModel):
 
     @property
     def is_episode(self) -> bool:
-        return self.kind == PODCAST
+        return self.kind == "podcast"
 
 
 def _get(url: str) -> str:
