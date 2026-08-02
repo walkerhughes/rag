@@ -202,7 +202,7 @@ service = awsx.ecs.FargateService(
             ],
             environment=[
                 awsx.ecs.TaskDefinitionKeyValuePairArgs(name="ENVIRONMENT", value=STACK),
-                awsx.ecs.TaskDefinitionKeyValuePairArgs(name="OTEL_SERVICE_NAME", value="rag-api"),
+                awsx.ecs.TaskDefinitionKeyValuePairArgs(name="GIT_SHA", value=GIT_SHA),
                 awsx.ecs.TaskDefinitionKeyValuePairArgs(
                     name="OTEL_EXPORTER_OTLP_ENDPOINT", value=otlp_endpoint
                 ),

@@ -33,7 +33,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     arguments.add_argument("--slug", action="append", help="ingest one episode; repeatable")
     parsed = arguments.parse_args(argv)
 
-    configure_tracing()
+    configure_tracing("rag-ingestion")
     with tracer.start_as_current_span("ingestion_worker"):
         listings = select(parsed.limit, parsed.slug)
         with session() as active:
