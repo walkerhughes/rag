@@ -17,6 +17,13 @@ class IngestionStatus(StrEnum):
     FAILED = "failed"
 
 
+# A conversational turn runs to a few hundred words. Far above that means turn headers
+# went unmatched and the transcript collapsed into a handful of giant blocks, which stores
+# as a valid episode while being unusable. Observed: 132 words a turn across the archive,
+# 481 for the most monologue-heavy real episode, and 6274 upwards for broken parses.
+MOST_WORDS_PER_TURN = 1000
+
+
 def _normalize(name: str) -> str:
     return " ".join(name.split())
 
@@ -66,6 +73,16 @@ class Episode(BaseModel):
         positions = [segment.position for segment in self.segments]
         if positions != list(range(len(positions))):
             raise ValueError("segment positions must be contiguous and start at zero")
+        return self
+
+    @model_validator(mode="after")
+    def turns_are_plausibly_segmented(self) -> "Episode":
+        words = sum(len(segment.text.split()) for segment in self.segments)
+        if words / len(self.segments) > MOST_WORDS_PER_TURN:
+            raise ValueError(
+                f"{words} words across only {len(self.segments)} turns,"
+                " so speaker turns were probably missed"
+            )
         return self
 
     @property

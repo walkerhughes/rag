@@ -1,46 +1,18 @@
 """Constraint and persistence tests for the canonical corpus. These need the database."""
 
 import uuid
-from collections.abc import Iterator
 from datetime import date, timedelta
-from pathlib import Path
 
 import pytest
-from alembic import command
-from alembic.config import Config
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from corpus.models import Episode as DomainEpisode
 from corpus.models import IngestionStatus, TranscriptSegment
-from storage.postgres import Base, engine, models, repositories
+from storage.postgres import models, repositories
 
 pytestmark = pytest.mark.integration
-
-
-@pytest.fixture(scope="module", autouse=True)
-def schema_at_head() -> None:
-    """The migration tests leave the database at base, so do not assume a schema exists."""
-    command.upgrade(Config(str(Path(__file__).parents[3] / "alembic.ini")), "head")
-
-
-@pytest.fixture
-def session() -> Iterator[Session]:
-    """Rolls back, so each test sees an empty corpus."""
-    with Session(engine) as active:
-        yield active
-        active.rollback()
-    with Session(engine) as cleanup:
-        for table in (
-            "transcript_segment",
-            "episode_speaker",
-            "episode",
-            "speaker",
-            "ingestion_run",
-        ):
-            cleanup.execute(Base.metadata.tables[table].delete())
-        cleanup.commit()
 
 
 def sutton(segments: list[TranscriptSegment] | None = None) -> DomainEpisode:

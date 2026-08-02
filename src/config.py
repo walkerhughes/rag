@@ -9,6 +9,9 @@ class Settings(BaseSettings):
 
     environment: str = "local"
 
+    # Baked into the image at build time. Ties a trace to the commit that produced it.
+    service_version: str = Field(default="unknown", validation_alias="GIT_SHA")
+
     # SecretStr masks the value in logs and tracebacks. Read it with .get_secret_value().
     honeycomb_api_key: SecretStr | None = Field(default=None, validation_alias="HONEYCOMB_API_KEY")
 

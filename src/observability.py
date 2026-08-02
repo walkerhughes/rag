@@ -1,7 +1,11 @@
 """Tracing setup shared by every app and worker.
 
-Call `configure_tracing()` once at process start; import `tracer` anywhere.
-The exporter endpoint is read from OTEL_EXPORTER_OTLP_ENDPOINT by the SDK.
+Call `configure_tracing()` once at process start, naming the service; import `tracer`
+anywhere. The exporter endpoint is read from OTEL_EXPORTER_OTLP_ENDPOINT by the SDK.
+
+The service name selects the Honeycomb dataset, and the API key selects the Honeycomb
+environment. Components are therefore separated as datasets, and deployment stages as
+environments.
 """
 
 import os
@@ -18,14 +22,20 @@ from config import settings
 tracer = trace.get_tracer("rag")
 
 
-def configure_tracing() -> None:
+def configure_tracing(service: str | None = None) -> None:
     """Idempotent. Records spans locally; exports only when an endpoint and key are set."""
     if isinstance(trace.get_tracer_provider(), TracerProvider):
         return
 
-    provider = TracerProvider(
-        resource=Resource.create({"deployment.environment": settings.environment})
-    )
+    attributes: dict[str, str] = {
+        # `deployment.environment` is the deprecated spelling of this attribute.
+        "deployment.environment.name": settings.environment,
+        "service.version": settings.service_version,
+    }
+    if service is not None:
+        attributes["service.name"] = service
+
+    provider = TracerProvider(resource=Resource.create(attributes))
     if os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT") and settings.honeycomb_api_key:
         # Built here rather than passed via OTEL_EXPORTER_OTLP_HEADERS, whose value the
         # SDK writes to the log when it cannot parse it.

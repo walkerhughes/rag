@@ -7,7 +7,7 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
 from observability import configure_tracing
 
-configure_tracing()
+configure_tracing("rag-api")
 
 app = FastAPI(title="rag")
 FastAPIInstrumentor.instrument_app(app)
