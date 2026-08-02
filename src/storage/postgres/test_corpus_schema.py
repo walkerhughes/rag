@@ -8,9 +8,10 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from corpus import repository
 from corpus.models import Episode as DomainEpisode
 from corpus.models import IngestionStatus, TranscriptSegment
-from storage.postgres import models, repositories
+from storage.postgres import models
 
 pytestmark = pytest.mark.integration
 
@@ -40,9 +41,9 @@ def count(session: Session, model: type) -> int:
 
 
 def test_saving_an_episode_stores_the_transcript_in_order(session: Session) -> None:
-    run = repositories.start_run(session, "dwarkesh")
-    episode_id = repositories.save_episode(session, run, sutton())
-    repositories.finish_run(session, run, IngestionStatus.SUCCEEDED)
+    run = repository.start_run(session, "dwarkesh")
+    episode_id = repository.save_episode(session, run, sutton())
+    repository.finish_run(session, run, IngestionStatus.SUCCEEDED)
 
     segments = (
         session.execute(
@@ -64,8 +65,8 @@ def test_saving_an_episode_stores_the_transcript_in_order(session: Session) -> N
 
 def test_resaving_the_same_episode_creates_no_duplicates(session: Session) -> None:
     """Re-ingesting unchanged source data must not double the corpus."""
-    first = repositories.start_run(session, "dwarkesh")
-    episode_id = repositories.save_episode(session, first, sutton())
+    first = repository.start_run(session, "dwarkesh")
+    episode_id = repository.save_episode(session, first, sutton())
     segment_ids = set(
         session.execute(
             select(models.TranscriptSegment.id).where(
@@ -74,8 +75,8 @@ def test_resaving_the_same_episode_creates_no_duplicates(session: Session) -> No
         ).scalars()
     )
 
-    second = repositories.start_run(session, "dwarkesh")
-    assert repositories.save_episode(session, second, sutton()) == episode_id
+    second = repository.start_run(session, "dwarkesh")
+    assert repository.save_episode(session, second, sutton()) == episode_id
 
     assert count(session, models.Episode) == 1
     assert count(session, models.Speaker) == 2
@@ -94,9 +95,9 @@ def test_resaving_the_same_episode_creates_no_duplicates(session: Session) -> No
 
 
 def test_a_shorter_transcript_removes_the_stale_turns(session: Session) -> None:
-    run = repositories.start_run(session, "dwarkesh")
-    repositories.save_episode(session, run, sutton())
-    repositories.save_episode(
+    run = repository.start_run(session, "dwarkesh")
+    repository.save_episode(session, run, sutton())
+    repository.save_episode(
         session,
         run,
         sutton(
@@ -107,8 +108,8 @@ def test_a_shorter_transcript_removes_the_stale_turns(session: Session) -> None:
 
 
 def test_two_turns_cannot_share_a_position(session: Session) -> None:
-    run = repositories.start_run(session, "dwarkesh")
-    episode_id = repositories.save_episode(session, run, sutton())
+    run = repository.start_run(session, "dwarkesh")
+    episode_id = repository.save_episode(session, run, sutton())
     speaker_id = session.execute(select(models.Speaker.id)).scalars().first()
 
     session.add(
@@ -125,8 +126,8 @@ def test_two_turns_cannot_share_a_position(session: Session) -> None:
 
 
 def test_two_episodes_cannot_share_a_source_id(session: Session) -> None:
-    run = repositories.start_run(session, "dwarkesh")
-    repositories.save_episode(session, run, sutton())
+    run = repository.start_run(session, "dwarkesh")
+    repository.save_episode(session, run, sutton())
     session.add(
         models.Episode(
             source_id="richard-sutton",
@@ -142,8 +143,8 @@ def test_two_episodes_cannot_share_a_source_id(session: Session) -> None:
 
 def test_a_repeated_turn_at_a_new_position_is_kept(session: Session) -> None:
     """Short turns legitimately repeat, so identical text is not itself a duplicate."""
-    run = repositories.start_run(session, "dwarkesh")
-    repositories.save_episode(
+    run = repository.start_run(session, "dwarkesh")
+    repository.save_episode(
         session,
         run,
         sutton(
@@ -158,7 +159,7 @@ def test_a_repeated_turn_at_a_new_position_is_kept(session: Session) -> None:
 
 
 def test_a_segment_requires_a_real_episode(session: Session) -> None:
-    run = repositories.start_run(session, "dwarkesh")
+    run = repository.start_run(session, "dwarkesh")
     speaker = models.Speaker(name="Nobody", ingestion_run_id=run.id)
     session.add(speaker)
     session.flush()
@@ -177,8 +178,8 @@ def test_a_segment_requires_a_real_episode(session: Session) -> None:
 
 
 def test_a_failed_run_is_recorded_rather_than_discarded(session: Session) -> None:
-    run = repositories.start_run(session, "dwarkesh")
-    repositories.finish_run(session, run, IngestionStatus.FAILED, error="parser matched no turns")
+    run = repository.start_run(session, "dwarkesh")
+    repository.finish_run(session, run, IngestionStatus.FAILED, error="parser matched no turns")
     session.commit()
 
     stored = session.get(models.IngestionRun, run.id)

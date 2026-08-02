@@ -6,10 +6,11 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from corpus import repository
 from corpus.models import Episode, TranscriptSegment
 from retrieval import lexical
 from retrieval.indexing import index_episode
-from storage.postgres import models, repositories
+from storage.postgres import models
 
 pytestmark = pytest.mark.integration
 
@@ -21,7 +22,7 @@ def build(
     published: date,
     texts: list[str],
 ) -> None:
-    run = repositories.start_run(session, "test")
+    run = repository.start_run(session, "test")
     episode = Episode(
         source_id=source_id,
         title=source_id.replace("-", " ").title(),
@@ -37,7 +38,7 @@ def build(
             for index, text in enumerate(texts)
         ],
     )
-    episode_id = repositories.save_episode(session, run, episode)
+    episode_id = repository.save_episode(session, run, episode)
     index_episode(session, episode_id)
 
 

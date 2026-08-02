@@ -8,7 +8,7 @@ from collections.abc import Sequence
 from corpus.ingestion.dwarkesh import client, pipeline
 from corpus.models import Episode
 from observability import configure_tracing, tracer
-from retrieval.indexing import index_all
+from retrieval.indexing import index_all, index_episode
 from storage.postgres import session
 
 ARCHIVE_SEARCH_DEPTH = 200
@@ -97,6 +97,10 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         with session() as active:
             result = pipeline.ingest(active, listings)
+            # Chunking is a separate step: ingestion writes documents and knows nothing
+            # about retrieval. The two are joined here, at the entry point.
+            for episode_id in result.episode_ids:
+                index_episode(active, episode_id)
 
     print(result.summary)
     for slug, reason in result.quarantined.items():

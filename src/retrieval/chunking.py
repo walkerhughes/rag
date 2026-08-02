@@ -13,13 +13,24 @@ from datetime import timedelta
 
 from pydantic import BaseModel, Field
 
-from corpus.models import TranscriptSegment
-
 CHUNKER_VERSION = "1"
 TARGET_WORDS = 200
 LONGEST_CHUNK_WORDS = 400
 
 SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
+
+
+class Turn(BaseModel):
+    """What chunking needs from a stored turn.
+
+    Retrieval declares this rather than importing the corpus model, so a different source
+    can feed the same chunker without retrieval knowing anything about that source.
+    """
+
+    position: int = Field(ge=0)
+    speaker: str = Field(min_length=1)
+    text: str = Field(min_length=1)
+    start: timedelta | None = None
 
 
 class Chunk(BaseModel):
@@ -56,10 +67,10 @@ def _split_long_turn(text: str) -> list[str]:
     return pieces or [text]
 
 
-def chunk_segments(segments: list[TranscriptSegment]) -> list[Chunk]:
+def chunk_turns(turns: list[Turn]) -> list[Chunk]:
     """Deterministic: the same turns always produce the same chunks."""
     chunks: list[Chunk] = []
-    pending: list[TranscriptSegment] = []
+    pending: list[Turn] = []
 
     def flush() -> None:
         nonlocal pending
@@ -77,7 +88,7 @@ def chunk_segments(segments: list[TranscriptSegment]) -> list[Chunk]:
         )
         pending = []
 
-    for segment in sorted(segments, key=lambda item: item.position):
+    for segment in sorted(turns, key=lambda item: item.position):
         if _words(segment.text) > LONGEST_CHUNK_WORDS:
             flush()
             for piece in _split_long_turn(segment.text):

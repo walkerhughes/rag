@@ -5,10 +5,10 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from corpus.models import TranscriptSegment
 from observability import tracer
-from retrieval.chunking import chunk_segments
-from storage.postgres import models, repositories
+from retrieval.chunking import Turn, chunk_turns
+from retrieval.repository import save_chunks
+from storage.postgres import models
 
 
 def index_episode(session: Session, episode_id: uuid.UUID) -> int:
@@ -22,8 +22,8 @@ def index_episode(session: Session, episode_id: uuid.UUID) -> int:
             .where(models.TranscriptSegment.episode_id == episode_id)
             .order_by(models.TranscriptSegment.position)
         ).all()
-        segments = [
-            TranscriptSegment(
+        turns = [
+            Turn(
                 position=row.position,
                 speaker=speaker,
                 text=row.text,
@@ -32,8 +32,8 @@ def index_episode(session: Session, episode_id: uuid.UUID) -> int:
             for row, speaker in rows
         ]
 
-        chunks = chunk_segments(segments)
-        repositories.save_chunks(session, episode_id, chunks)
+        chunks = chunk_turns(turns)
+        save_chunks(session, episode_id, chunks)
 
         span.set_attribute("chunk.count", len(chunks))
         return len(chunks)
