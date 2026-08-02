@@ -103,6 +103,20 @@ repeating a query returns the same order.
 Changing the chunking rules means changing `CHUNKER_VERSION` and re-chunking, since
 anything derived from a chunk is invalidated by new boundaries.
 
+## Retrieval evaluation
+
+The regression suite runs fixed queries against a corpus built from the committed
+transcript fixtures. It must never read the live archive: a suite whose corpus changes
+measures the corpus rather than the retriever, and a newly published episode would move
+the numbers while a green run meant nothing.
+
+Assertions name a phrase rather than a chunk identifier, so re-chunking may move
+boundaries but may not lose the passage.
+
+Floors are raised when a change earns it and never lowered to make a failing run pass. A
+floor nothing can fail is not a gate, which is why the suite also asserts that a known
+weakness still measures as one.
+
 ## Observability
 
 Honeycomb environments are deployment stages, and datasets are services. The environment
