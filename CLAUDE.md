@@ -48,6 +48,16 @@ not the normal way to undo a change.
 single migration must never break the version currently running. Add a column, deploy code
 that writes it, backfill, then drop the old one in a later migration.
 
+## Ingestion
+
+Check a parse with `make preview SLUG=<slug>` before ingesting for real. It fetches and
+parses without writing and needs no database, and its report shows the turn count,
+speakers, word count, timestamp coverage, longest turn, and the first and last turns.
+
+The archive's `type` field is not a reliable indicator that a post has a transcript: some
+essays are published as podcasts. A page that yields no speaker turns is quarantined
+rather than stored empty.
+
 ## Observability
 
 Honeycomb environments are deployment stages, and datasets are services. The environment

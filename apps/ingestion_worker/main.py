@@ -4,12 +4,13 @@ import argparse
 import sys
 from collections.abc import Sequence
 
-from corpus.ingestion.dwarkesh import client
-from corpus.ingestion.dwarkesh.pipeline import ingest
+from corpus.ingestion.dwarkesh import client, pipeline
+from corpus.models import Episode
 from observability import configure_tracing, tracer
 from storage.postgres import session
 
-ARCHIVE_SEARCH_DEPTH = 120
+ARCHIVE_SEARCH_DEPTH = 200
+PREVIEW_CHARACTERS = 100
 
 
 def select(limit: int, slugs: list[str] | None) -> list[client.EpisodeListing]:
@@ -27,17 +28,64 @@ def select(limit: int, slugs: list[str] | None) -> list[client.EpisodeListing]:
     return found
 
 
+def describe(episode: Episode) -> str:
+    """What a parse looks like, in enough detail to tell a good one from a bad one."""
+    segments = episode.segments
+    words = sum(len(segment.text.split()) for segment in segments)
+    timed = sum(1 for segment in segments if segment.start is not None)
+    longest = max(segments, key=lambda segment: len(segment.text))
+
+    def excerpt(text: str) -> str:
+        return text[:PREVIEW_CHARACTERS] + ("..." if len(text) > PREVIEW_CHARACTERS else "")
+
+    return "\n".join(
+        [
+            f"{episode.source_id}  {episode.published_at}",
+            f"  title      {episode.title}",
+            f"  turns      {len(segments)}",
+            f"  speakers   {', '.join(episode.speakers)}",
+            f"  words      {words}",
+            f"  timestamps {timed}/{len(segments)}",
+            f"  longest    {len(longest.text)} chars, {longest.speaker}",
+            f"  first      {segments[0].speaker}: {excerpt(segments[0].text)}",
+            f"  last       {segments[-1].speaker}: {excerpt(segments[-1].text)}",
+        ]
+    )
+
+
+def dry_run(listings: list[client.EpisodeListing]) -> int:
+    """Fetches and parses without writing, so a parse can be checked before a full run."""
+    failures = 0
+    for listing in listings:
+        try:
+            print(describe(pipeline.fetch_and_parse(listing)))
+        except pipeline.QUARANTINABLE as error:
+            failures += 1
+            print(f"{listing.slug}  FAILED  {type(error).__name__}: {error}", file=sys.stderr)
+    return 1 if failures else 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     arguments = argparse.ArgumentParser(description="Ingest Dwarkesh episodes into the corpus.")
     arguments.add_argument("--limit", type=int, default=5, help="how many recent episodes")
     arguments.add_argument("--slug", action="append", help="ingest one episode; repeatable")
+    arguments.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="fetch and parse only, writing nothing and needing no database",
+    )
     parsed = arguments.parse_args(argv)
 
     configure_tracing("rag-ingestion")
-    with tracer.start_as_current_span("ingestion_worker"):
+    with tracer.start_as_current_span("ingestion_worker") as span:
+        span.set_attribute("ingestion.dry_run", parsed.dry_run)
         listings = select(parsed.limit, parsed.slug)
+
+        if parsed.dry_run:
+            return dry_run(listings)
+
         with session() as active:
-            result = ingest(active, listings)
+            result = pipeline.ingest(active, listings)
 
     print(result.summary)
     for slug, reason in result.quarantined.items():

@@ -49,8 +49,8 @@ namespace_packages = true
 explicit_package_bases = true
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
-testpaths = ["src"]
+pythonpath = ["src", "."]
+testpaths = ["src", "apps"]
 addopts = "--strict-markers --strict-config"
 markers = ["integration: requires external services (Postgres, Neo4j, network)"]
 

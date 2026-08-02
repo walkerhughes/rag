@@ -36,9 +36,8 @@ class Result:
         return ", ".join(parts)
 
 
-def ingest_episode(
-    session: Session, run: models.IngestionRun, listing: client.EpisodeListing
-) -> uuid.UUID:
+def fetch_and_parse(listing: client.EpisodeListing) -> Episode:
+    """Everything up to persistence. Touches no database, so it is safe to run anywhere."""
     with tracer.start_as_current_span("episode.fetch") as span:
         span.set_attribute("episode.source_id", listing.slug)
         html = client.fetch_page(listing.slug)
@@ -57,7 +56,13 @@ def ingest_episode(
             segments=segments,
         )
         span.set_attribute("episode.speakers", len(episode.speakers))
+        return episode
 
+
+def ingest_episode(
+    session: Session, run: models.IngestionRun, listing: client.EpisodeListing
+) -> uuid.UUID:
+    episode = fetch_and_parse(listing)
     with tracer.start_as_current_span("episode.persist") as span:
         episode_id = repositories.save_episode(session, run, episode)
         span.set_attribute("episode.id", str(episode_id))

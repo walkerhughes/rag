@@ -1,4 +1,4 @@
-.PHONY: up down reset logs psql ingest check test test-integration
+.PHONY: up down reset logs psql preview ingest check test test-integration
 
 # Starts Postgres, waits for it to pass its healthcheck, and migrates it to head.
 up:
@@ -21,6 +21,11 @@ logs:
 
 psql:
 	docker compose exec postgres psql -U rag -d rag
+
+# Fetches and parses without writing, to check a parse before ingesting for real.
+# Needs no database. Pass SLUG=<slug> for one episode.
+preview:
+	PYTHONPATH=src uv run python -m apps.ingestion_worker.main --dry-run $(if $(SLUG),--slug $(SLUG),--limit $(LIMIT))
 
 # Ingests recent episodes from dwarkesh.com. Pass SLUG=<slug> for one episode.
 ingest: up
