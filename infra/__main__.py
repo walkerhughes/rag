@@ -153,17 +153,14 @@ aws.iam.RolePolicyAttachment(
 aws.iam.RolePolicy(
     "execution-ssm",
     role=execution_role.id,
-    policy=honeycomb_key_parameter.arn.apply(
-        lambda arn: (
-            aws.iam.get_policy_document(
-                statements=[
-                    aws.iam.GetPolicyDocumentStatementArgs(
-                        actions=["ssm:GetParameters"], resources=[arn]
-                    )
-                ]
-            ).json
-        )
-    ),
+    policy=aws.iam.get_policy_document_output(
+        statements=[
+            aws.iam.GetPolicyDocumentStatementArgs(
+                actions=["ssm:GetParameters"],
+                resources=[honeycomb_key_parameter.arn],
+            )
+        ]
+    ).json,
 )
 
 # The application's own role. No policies attached: the app calls no AWS APIs.
@@ -189,6 +186,8 @@ service = awsx.ecs.FargateService(
         runtime_platform=aws.ecs.TaskDefinitionRuntimePlatformArgs(
             cpu_architecture="ARM64", operating_system_family="LINUX"
         ),
+        # Container logs are kept forever by default.
+        log_group=awsx.awsx.DefaultLogGroupArgs(args=awsx.awsx.LogGroupArgs(retention_in_days=14)),
         container=awsx.ecs.TaskDefinitionContainerDefinitionArgs(
             name="api",
             image=image.image_uri,
@@ -217,7 +216,7 @@ service = awsx.ecs.FargateService(
     ),
 )
 
-pulumi.export("url", load_balancer.load_balancer.dns_name.apply(lambda n: f"http://{n}"))
+pulumi.export("url", pulumi.Output.concat("http://", load_balancer.load_balancer.dns_name))
 pulumi.export("image", image.image_uri)
 pulumi.export("cluster", cluster.name)
 pulumi.export("service", service.service.name)

@@ -3,3 +3,8 @@ encryptedkey: AQICAHgpkF8raK9xv/ip2rAyvZVW3gPszeDX5uwRQb3Y/ds4LwFXyKzhDxy1c3ywen
 config:
   aws:region: us-east-1
   aws:profile: walker-rag-app
+  aws:defaultTags:
+    tags:
+      Project: rag
+      ManagedBy: pulumi
+      Stack: dev
