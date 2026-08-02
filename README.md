@@ -18,7 +18,7 @@ still records spans locally, so nothing needs a network to run.
 CI runs exactly these, in this order:
 
 ```bash
-uv run ruff format --check . && uv run ruff check . && uv run mypy src && uv run pytest --cov
+uv run ruff format --check . && uv run ruff check . && uv run mypy src apps && uv run pytest --cov
 ```
 
 `.claude/hooks/format.sh` runs `ruff format` on every Python file Claude edits, so the
