@@ -17,6 +17,8 @@ class Settings(BaseSettings):
 
     # Defaults to the docker-compose database. A deployed service overrides it, and the
     # DSN carries a password, so it is masked like any other credential.
+    opensearch_url: str = Field(default="http://localhost:9200", validation_alias="OPENSEARCH_URL")
+
     database_url: SecretStr = Field(
         default=SecretStr("postgresql+psycopg://rag:rag@localhost:5433/rag"),
         validation_alias="DATABASE_URL",

@@ -58,6 +58,26 @@ The archive's `type` field is not a reliable indicator that a post has a transcr
 essays are published as podcasts. A page that yields no speaker turns is quarantined
 rather than stored empty.
 
+## Layering
+
+Document ingestion and retrieval must stay independent, so either can be replaced without
+touching the other. Reusing retrieval on a different corpus should mean writing a new
+ingestion layer and a schema, and nothing else.
+
+```
+apps/                      entry points, where the layers are composed
+  corpus/     ingestion  ─┐
+  retrieval/  search     ─┴─> storage/ ─> config/, observability/
+```
+
+`corpus` and `retrieval` never import each other. `storage` holds the schema and imports
+neither, so it knows nothing about what fills it or reads it. Persistence belongs to the
+layer that owns the concept: episodes to `corpus`, chunks to `retrieval`. Chunking
+declares the turn shape it needs rather than importing the corpus model.
+
+`src/test_layering.py` walks the import graph and fails on a violation. Add a layer to
+`ALLOWED` there before introducing it.
+
 ## Retrieval
 
 Chunks pack consecutive turns toward two hundred words and split a longer turn at
@@ -67,7 +87,13 @@ and each records the range of turns it covers so a passage resolves back to its 
 and position.
 
 Every strategy returns `Evidence`, so results from different strategies can be compared
-and cited the same way.
+and cited the same way, and they share chunk identifiers so a citation resolves the same
+whichever strategy found it.
+
+Two lexical strategies exist on purpose. Postgres full-text ranking has no term-rarity
+weighting; OpenSearch gives BM25, which does. Keeping both lets the evaluation harness
+measure the difference rather than assume it. The search index is a projection of the
+chunk table and can be dropped and rebuilt at any time.
 
 Full-text queries match any of a question's terms, not all of them. Requiring every term
 makes a natural-language question unmatchable, which reads as a retrieval failure when it

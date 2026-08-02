@@ -8,7 +8,8 @@ from collections.abc import Sequence
 from corpus.ingestion.dwarkesh import client, pipeline
 from corpus.models import Episode
 from observability import configure_tracing, tracer
-from retrieval.indexing import index_all, index_episode
+from retrieval.bm25 import client as search_client
+from retrieval.indexing import index_all, index_episode, project_to_search
 from storage.postgres import session
 
 ARCHIVE_SEARCH_DEPTH = 200
@@ -87,7 +88,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         if parsed.reindex:
             with session() as active:
                 chunks = index_all(active)
-            print(f"re-chunked {chunks} chunks")
+                documents = project_to_search(active, search_client(), rebuild=True)
+            print(f"re-chunked {chunks} chunks, indexed {documents} for search")
             return 0
 
         listings = select(parsed.limit, parsed.slug)
@@ -101,6 +103,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             # about retrieval. The two are joined here, at the entry point.
             for episode_id in result.episode_ids:
                 index_episode(active, episode_id)
+            if result.episode_ids:
+                project_to_search(active, search_client())
 
     print(result.summary)
     for slug, reason in result.quarantined.items():

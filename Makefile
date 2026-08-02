@@ -22,6 +22,10 @@ logs:
 psql:
 	docker compose exec postgres psql -U rag -d rag
 
+# Rebuilds the search index from the chunks in Postgres.
+search-rebuild: up
+	PYTHONPATH=src uv run python -m apps.ingestion_worker.main --reindex
+
 # Fetches and parses without writing, to check a parse before ingesting for real.
 # Needs no database. Pass SLUG=<slug> for one episode.
 preview:
