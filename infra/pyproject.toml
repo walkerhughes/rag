@@ -1,0 +1,10 @@
+[project]
+name = "rag-infra"
+version = "0.1.0"
+description = "Pulumi program for the rag AWS backend"
+requires-python = ">=3.13"
+dependencies = [
+    "pulumi>=3.150",
+    "pulumi-aws>=6.66",
+    "pulumi-awsx>=2.19",
+]
