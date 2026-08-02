@@ -34,6 +34,7 @@ curl localhost:8000/health
 | `make down` | Stop it, keeping the data |
 | `make reset` | Discard the data and rebuild from migrations |
 | `make psql` | Open a shell on the database |
+| `make ingest` | Ingest recent episodes (`LIMIT=10`, or `SLUG=richard-sutton`) |
 | `make check` | Everything CI runs: format, lint, types, unit tests |
 | `make test-integration` | Tests that need the database |
 

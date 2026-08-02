@@ -23,14 +23,15 @@ parsed rather than inferred.
 Two properties of the source were confirmed against a 12-episode sample and shape the
 examples below:
 
-- Turn headers come in two markup variants, one with an inline timestamp and one without.
-  Both must parse, and the timestamp is not always available.
-- Rendered pages repeat long transcript turns. In the sample every episode contained
-  duplicated turns over 200 characters, up to 81 in one episode. Deduplication has to be
-  content-based; positional assumptions will not catch this.
-
-One episode in the sample of twelve did not parse at all. That is the quarantine path in
-issue #6, not a case to special-case away.
+- Turn headers come in three markup variants: a bare bolded name, a name with an inline
+  timestamp, and a name wrapped in a further span. Matching the structure of the
+  paragraph rather than the exact markup handles all three.
+- Timestamps are present in some episodes and absent in others, so a segment's start time
+  is optional rather than missing data.
+- Pages carry the whole transcript a second time, below the comments, inside an embedded
+  script. Parsing stops at the discussion section, which removes the copy exactly. No
+  content-level deduplication is needed, and none is done: identical short turns are
+  common and legitimate.
 
 ## Question classes
 
