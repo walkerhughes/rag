@@ -11,11 +11,12 @@ from corpus.models import TranscriptSegment
 TAGS = re.compile(r"<[^>]+>")
 PARAGRAPH = re.compile(r"<p\b[^>]*>(.*?)</p>", re.S)
 TIMESTAMP = re.compile(r"^\(?(\d{1,2}):(\d{2}):(\d{2})\)?$")
+BREAK = re.compile(r"<br\s*/?>", re.I)
 
-# A turn header is a paragraph whose entire text is a bolded speaker name, optionally
-# followed by a timestamp. Matching on structure rather than on exact markup covers the
-# three variants the site uses: a bare name, a name with an inline timestamp, and a name
-# wrapped in a further span.
+# A turn header is a bolded speaker name, optionally followed by a timestamp. Matching on
+# structure rather than on exact markup covers the four variants the site uses: a bare
+# name, a name with an inline timestamp, a name wrapped in a further span, and a name
+# followed by a line break and the turn's own words in the same paragraph.
 HEADER = re.compile(r"^\s*<strong>(?P<name>.*?)</strong>(?P<rest>.*)$", re.S)
 LONGEST_SPEAKER_NAME = 60
 
@@ -42,22 +43,30 @@ def article_body(html: str) -> str:
     return body[:end] if end != -1 else body
 
 
-def _header(paragraph: str) -> tuple[str, timedelta | None] | None:
-    match = HEADER.match(paragraph.strip())
+def _turn_start(paragraph: str) -> tuple[str, timedelta | None, str] | None:
+    """The speaker, the timestamp, and any turn text sharing the header's paragraph.
+
+    Some episodes put the whole turn in one paragraph, with the name and timestamp
+    separated from the words by a line break.
+    """
+    head, *remainder = BREAK.split(paragraph.strip(), maxsplit=1)
+    match = HEADER.match(head.strip())
     if match is None:
         return None
     name = _plain(match.group("name"))
     if not name or len(name) > LONGEST_SPEAKER_NAME:
         return None
 
-    rest = _plain(match.group("rest"))
-    if not rest:
-        return name, None
-    stamp = TIMESTAMP.match(rest)
-    if stamp is None:
-        return None
-    hours, minutes, seconds = (int(part) for part in stamp.groups())
-    return name, timedelta(hours=hours, minutes=minutes, seconds=seconds)
+    start = None
+    trailing = _plain(match.group("rest"))
+    if trailing:
+        stamp = TIMESTAMP.match(trailing)
+        if stamp is None:
+            return None
+        hours, minutes, seconds = (int(part) for part in stamp.groups())
+        start = timedelta(hours=hours, minutes=minutes, seconds=seconds)
+
+    return name, start, _plain(remainder[0]) if remainder else ""
 
 
 def parse_transcript(html: str) -> list[TranscriptSegment]:
@@ -80,10 +89,12 @@ def parse_transcript(html: str) -> list[TranscriptSegment]:
         paragraphs = []
 
     for match in PARAGRAPH.finditer(article_body(html)):
-        header = _header(match.group(1))
+        header = _turn_start(match.group(1))
         if header is not None:
             close_turn()
-            speaker, start = header
+            speaker, start, leading = header
+            if leading:
+                paragraphs.append(leading)
         elif speaker is not None:
             body = _plain(match.group(1))
             if body:

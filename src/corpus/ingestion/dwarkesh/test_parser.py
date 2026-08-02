@@ -93,3 +93,22 @@ def test_a_bold_run_inside_a_sentence_is_not_a_turn_header() -> None:
     segments = parse_transcript(html)
     assert len(segments) == 1
     assert segments[0].text == "He said this bit was the important part."
+
+
+def test_a_turn_sharing_one_paragraph_with_its_header_is_parsed() -> None:
+    """Some episodes put the name, timestamp and words in a single paragraph."""
+    html = (
+        '<div class="available-content">'
+        "<p><strong>Kenneth Rogoff </strong><em>00:00:49</em><strong><br/></strong>"
+        "<span>First I want to be careful.</span></p>"
+        "<p>A second paragraph of the same turn.</p>"
+        "<p><strong>Dwarkesh Patel </strong><em>00:04:16</em><strong><br/></strong>"
+        "<span>You mentioned the book.</span></p>"
+        "</div>"
+    )
+    segments = parse_transcript(html)
+
+    assert [segment.speaker for segment in segments] == ["Kenneth Rogoff", "Dwarkesh Patel"]
+    assert segments[0].text == "First I want to be careful. A second paragraph of the same turn."
+    assert segments[0].start == timedelta(seconds=49)
+    assert segments[1].text == "You mentioned the book."

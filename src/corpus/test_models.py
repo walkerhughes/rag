@@ -65,3 +65,15 @@ def test_speakers_are_distinct_and_in_first_appearance_order() -> None:
         ]
     )
     assert parsed.speakers == ["Dwarkesh Patel", "Richard Sutton"]
+
+
+def test_an_episode_collapsed_into_a_few_giant_turns_is_rejected() -> None:
+    """Missed headers store as a valid episode while being unusable, which is worse."""
+    with pytest.raises(ValidationError, match="turns were probably missed"):
+        make_episode(segments=[turn(0, text="word " * 5000), turn(1, text="word " * 5000)])
+
+
+def test_a_monologue_heavy_episode_is_still_accepted() -> None:
+    """Real episodes run to a few hundred words a turn, so the guard must not catch them."""
+    long_turn = "word " * 480
+    assert make_episode(segments=[turn(i, text=long_turn) for i in range(5)]).segments
