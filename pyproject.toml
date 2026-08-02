@@ -4,13 +4,15 @@ version = "0.1.0"
 description = "Agentic GraphRAG over speaker-attributed Dwarkesh Podcast transcripts"
 readme = "README.md"
 requires-python = ">=3.13"
+# Instrumentation packages arrive with the library they instrument, not before it:
+# psycopg with #4, an HTTP client with #6, ASGI with #10. `opentelemetry-distro` is
+# deliberately absent because it exists for zero-code `opentelemetry-instrument`
+# startup, and observability.py configures the SDK explicitly instead.
 dependencies = [
     "pydantic>=2.10",
     "pydantic-settings>=2.7",
     "opentelemetry-sdk>=1.44.0",
-    "opentelemetry-exporter-otlp>=1.44.0",
-    "opentelemetry-instrumentation>=0.65b0",
-    "opentelemetry-instrumentation-logging==0.65b0",
+    "opentelemetry-exporter-otlp-proto-http>=1.44.0",
 ]
 
 [dependency-groups]

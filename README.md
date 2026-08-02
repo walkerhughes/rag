@@ -21,6 +21,10 @@ CI runs exactly these, in this order:
 uv run ruff format --check . && uv run ruff check . && uv run mypy src && uv run pytest --cov
 ```
 
+`.claude/hooks/format.sh` runs `ruff format` on every Python file Claude edits, so the
+working tree stays formatted between check runs. It sorts imports but deliberately does
+not strip unused ones, which would delete an import written just before its first use.
+
 ## Layout
 
 `src/` is the import root. Capability modules start flat and become packages when they

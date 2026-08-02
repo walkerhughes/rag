@@ -1,5 +1,6 @@
 .venv
 .env
+.claude/settings.local.json
 __pycache__/
 .pytest_cache/
 .mypy_cache/
