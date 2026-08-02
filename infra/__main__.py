@@ -3,6 +3,8 @@
 ECR, a VPC, and one Fargate service behind an application load balancer.
 """
 
+import os
+
 import pulumi
 import pulumi_aws as aws
 import pulumi_awsx as awsx
@@ -10,6 +12,9 @@ import pulumi_awsx as awsx
 config = pulumi.Config()
 otlp_endpoint = config.get("otlpEndpoint") or "https://api.honeycomb.io"
 STACK = pulumi.get_stack()
+
+# Baked into the image and reported by /health, so the running revision is identifiable.
+GIT_SHA = os.environ.get("GIT_SHA", "unknown")
 
 PORT = 8000
 
@@ -98,6 +103,7 @@ image = awsx.ecr.Image(
     context="..",
     dockerfile="../Dockerfile",
     platform="linux/arm64",
+    args={"GIT_SHA": GIT_SHA},
 )
 
 # --- load balancer ---------------------------------------------------------------
@@ -196,7 +202,7 @@ service = awsx.ecs.FargateService(
                 )
             ],
             environment=[
-                awsx.ecs.TaskDefinitionKeyValuePairArgs(name="APP_ENV", value="dev"),
+                awsx.ecs.TaskDefinitionKeyValuePairArgs(name="ENVIRONMENT", value=STACK),
                 awsx.ecs.TaskDefinitionKeyValuePairArgs(name="OTEL_SERVICE_NAME", value="rag-api"),
                 awsx.ecs.TaskDefinitionKeyValuePairArgs(
                     name="OTEL_EXPORTER_OTLP_ENDPOINT", value=otlp_endpoint

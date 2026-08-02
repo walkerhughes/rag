@@ -32,8 +32,12 @@ need them, so nothing sits idle on the bill.
 State lives in `s3://rag-pulumi-state-682033482233`, encrypted by the `alias/rag-pulumi`
 KMS key. No Pulumi Cloud account is involved, so no Pulumi access token is needed.
 
+`GIT_SHA` is baked into the image and reported by `/health`, so the running revision is
+identifiable. It defaults to `unknown` when unset.
+
 ```bash
 export AWS_PROFILE=walker-rag-app
+export GIT_SHA=$(git rev-parse --short HEAD)
 pulumi login s3://rag-pulumi-state-682033482233
 cd infra && pulumi preview   # then: pulumi up
 ```
