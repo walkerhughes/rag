@@ -12,5 +12,12 @@ class Settings(BaseSettings):
     # SecretStr masks the value in logs and tracebacks. Read it with .get_secret_value().
     honeycomb_api_key: SecretStr | None = Field(default=None, validation_alias="HONEYCOMB_API_KEY")
 
+    # Defaults to the docker-compose database. A deployed service overrides it, and the
+    # DSN carries a password, so it is masked like any other credential.
+    database_url: SecretStr = Field(
+        default=SecretStr("postgresql+psycopg://rag:rag@localhost:5433/rag"),
+        validation_alias="DATABASE_URL",
+    )
+
 
 settings = Settings()

@@ -22,6 +22,47 @@ Run the API locally:
 uv run uvicorn apps.api.main:app --reload
 ```
 
+## Local database
+
+`make up` starts Postgres with pgvector, waits for its healthcheck, and migrates to head.
+`make down` stops it and keeps the data; `make reset` discards the volume and rebuilds
+from migrations alone, which is the fastest way to prove migrations still work from empty.
+
+```bash
+make up      # start and migrate
+make psql    # a shell on the database
+make reset   # throw it away and rebuild
+make down    # stop
+```
+
+It listens on **5433**, not 5432, so it never collides with a Postgres already installed
+on the host. `DATABASE_URL` overrides the default.
+
+## Migrations
+
+Alembic owns the schema. Application code never creates tables, and `Base.metadata` is
+the single description of what the schema should be.
+
+```bash
+uv run alembic revision --autogenerate -m "add episodes"
+uv run alembic upgrade head
+uv run alembic downgrade -1
+```
+
+`make test-integration` checks that a clean database reaches head, that the schema at head
+matches the models, and that a downgrade to base leaves nothing behind. CI runs the same
+tests against a Postgres service container, so a model change without a migration fails
+the build.
+
+**Roll forward by default.** A migration that has run anywhere other than a developer's
+machine is history: fix it with a new migration rather than editing it. `downgrade` is
+written for every migration and tested, but it is a local development tool and a last
+resort in an emergency, not the normal way to undo a change.
+
+**Expand, then contract.** Deployed code and the schema change at different moments, so a
+single migration must never break the currently running version. Add a column, deploy code
+that writes it, backfill, then drop the old one in a later migration.
+
 ## Deploying
 
 The stack is ECR, a two-AZ VPC, and one Fargate service behind an ALB, serving
@@ -62,11 +103,8 @@ aws ecs update-service --cluster <cluster> --service <service> --force-new-deplo
 
 ## Checks
 
-CI runs exactly these, in this order:
-
-```bash
-uv run ruff format --check . && uv run ruff check . && uv run mypy src apps && uv run pytest --cov
-```
+`make check` runs exactly what CI runs, in the same order. Integration tests are excluded
+from it because they need a database; `make test-integration` runs those.
 
 `.claude/hooks/format.sh` runs `ruff format` on every Python file Claude edits, so the
 working tree stays formatted between check runs. It sorts imports but deliberately does
