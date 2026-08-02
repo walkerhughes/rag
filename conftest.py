@@ -7,9 +7,11 @@ from pathlib import Path
 import pytest
 from alembic import command
 from alembic.config import Config
+from opensearchpy import OpenSearch
 from sqlalchemy.orm import Session
 
 from corpus.ingestion.dwarkesh import client
+from retrieval import bm25
 from storage.postgres import Base, engine
 
 REPO_ROOT = Path(__file__).parent
@@ -77,3 +79,11 @@ def offline(monkeypatch: pytest.MonkeyPatch) -> None:
         return path.read_text()
 
     monkeypatch.setattr(client, "fetch_page", fetch_page)
+
+
+@pytest.fixture
+def search_index() -> OpenSearch:
+    """An empty search index, rebuilt from scratch so tests never inherit documents."""
+    search = bm25.client()
+    bm25.recreate_index(search)
+    return search

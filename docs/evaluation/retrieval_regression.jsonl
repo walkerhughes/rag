@@ -1,0 +1,10 @@
+{"id": "reg-001", "query": "Where does Richard Sutton say the information goes in a continual learning setup?", "expected_episode": "richard-sutton", "expected_phrase": "goes into the weights"}
+{"id": "reg-002", "query": "What did Sutton write in his essay The Bitter Lesson?", "expected_episode": "richard-sutton", "expected_phrase": "Bitter Lesson"}
+{"id": "reg-003", "query": "Why does continual learning matter for building intelligent agents?", "expected_episode": "richard-sutton", "expected_phrase": "continual learning"}
+{"id": "reg-004", "query": "How does reward define what the right thing to do is?", "expected_episode": "richard-sutton", "expected_phrase": "reward"}
+{"id": "reg-005", "query": "What does Grant Sanderson say about Galois and the origins of group theory?", "expected_episode": "grant-sanderson-2", "expected_phrase": "group theory"}
+{"id": "reg-006", "query": "Is the quadratic formula something everyone learns at school?", "expected_episode": "grant-sanderson-2", "expected_phrase": "quadratic formula"}
+{"id": "reg-007", "query": "How does a verifier function decide whether mathematical work is accepted?", "expected_episode": "grant-sanderson-2", "expected_phrase": "verif"}
+{"id": "reg-008", "query": "reinforcement learning", "expected_episode": "richard-sutton", "expected_phrase": "reinforcement learning"}
+{"id": "reg-009", "query": "What is the relationship between mathematics and artificial intelligence?", "expected_episode": "grant-sanderson-2", "expected_phrase": "math"}
+{"id": "reg-010", "query": "large language models", "expected_episode": "richard-sutton", "expected_phrase": "language model"}

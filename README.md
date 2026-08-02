@@ -36,6 +36,7 @@ curl localhost:8000/health
 | `make psql` | Open a shell on the database |
 | `make preview` | Parse an episode without writing, to check it first. No database needed |
 | `make ingest` | Ingest recent episodes (`LIMIT=10`, or `SLUG=richard-sutton`) |
+| `make reindex` | Rebuild chunks and the search index, fetching nothing |
 | `make check` | Everything CI runs: format, lint, types, unit tests |
 | `make test-integration` | Tests that need the database |
 
@@ -53,6 +54,7 @@ default except the Honeycomb key.
 | Variable | Purpose |
 | --- | --- |
 | `DATABASE_URL` | Defaults to the docker-compose database |
+| `OPENSEARCH_URL` | Defaults to the docker-compose search node |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Where traces go. Unset means spans stay in-process |
 | `HONEYCOMB_API_KEY` | Sent as `x-honeycomb-team`. The key picks the Honeycomb environment |
 | `ENVIRONMENT` | Tags spans as `deployment.environment.name`. `local` by default |
@@ -68,6 +70,7 @@ apps/api/        HTTP entrypoint
 src/             capability modules, tests beside the code
   config.py        settings
   observability.py tracing
+  retrieval/       chunking and search
   storage/         database and migrations
 docs/evaluation/ the question classes the system claims to answer
 infra/           Pulumi program for AWS

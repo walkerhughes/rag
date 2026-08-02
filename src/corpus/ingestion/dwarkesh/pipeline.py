@@ -11,10 +11,11 @@ from dataclasses import dataclass, field
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
+from corpus import repository
 from corpus.ingestion.dwarkesh import client, parser
 from corpus.models import Episode, IngestionStatus
 from observability import tracer
-from storage.postgres import models, repositories
+from storage.postgres import models
 
 SOURCE = "dwarkesh"
 
@@ -26,6 +27,8 @@ QUARANTINABLE = (client.FetchError, parser.ParseError, ValidationError)
 class Result:
     ingested: list[str] = field(default_factory=list)
     quarantined: dict[str, str] = field(default_factory=dict)
+    # Identifiers of the episodes written, for whatever needs to process them next.
+    episode_ids: list[uuid.UUID] = field(default_factory=list)
 
     @property
     def summary(self) -> str:
@@ -64,7 +67,7 @@ def ingest_episode(
 ) -> uuid.UUID:
     episode = fetch_and_parse(listing)
     with tracer.start_as_current_span("episode.persist") as span:
-        episode_id = repositories.save_episode(session, run, episode)
+        episode_id = repository.save_episode(session, run, episode)
         span.set_attribute("episode.id", str(episode_id))
         return episode_id
 
@@ -72,7 +75,7 @@ def ingest_episode(
 def ingest(session: Session, listings: list[client.EpisodeListing]) -> Result:
     """Runs one ingestion run over the given episodes. The caller commits."""
     result = Result()
-    run = repositories.start_run(session, SOURCE)
+    run = repository.start_run(session, SOURCE)
 
     with tracer.start_as_current_span("ingest.run") as span:
         span.set_attribute("ingestion.run_id", str(run.id))
@@ -81,7 +84,7 @@ def ingest(session: Session, listings: list[client.EpisodeListing]) -> Result:
         for listing in listings:
             try:
                 with session.begin_nested():
-                    ingest_episode(session, run, listing)
+                    episode_id = ingest_episode(session, run, listing)
             except QUARANTINABLE as error:
                 reason = f"{type(error).__name__}: {error}"
                 result.quarantined[listing.slug] = reason
@@ -91,12 +94,13 @@ def ingest(session: Session, listings: list[client.EpisodeListing]) -> Result:
                 )
             else:
                 result.ingested.append(listing.slug)
+                result.episode_ids.append(episode_id)
 
         span.set_attribute("ingestion.ingested", len(result.ingested))
         span.set_attribute("ingestion.quarantined", len(result.quarantined))
 
         status = IngestionStatus.SUCCEEDED if result.ingested else IngestionStatus.FAILED
-        repositories.finish_run(
+        repository.finish_run(
             session, run, status, error=result.summary if result.quarantined else None
         )
 

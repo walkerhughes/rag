@@ -58,6 +58,65 @@ The archive's `type` field is not a reliable indicator that a post has a transcr
 essays are published as podcasts. A page that yields no speaker turns is quarantined
 rather than stored empty.
 
+## Layering
+
+Document ingestion and retrieval must stay independent, so either can be replaced without
+touching the other. Reusing retrieval on a different corpus should mean writing a new
+ingestion layer and a schema, and nothing else.
+
+```
+apps/                      entry points, where the layers are composed
+  corpus/     ingestion  ─┐
+  retrieval/  search     ─┴─> storage/ ─> config/, observability/
+```
+
+`corpus` and `retrieval` never import each other. `storage` holds the schema and imports
+neither, so it knows nothing about what fills it or reads it. Persistence belongs to the
+layer that owns the concept: episodes to `corpus`, chunks to `retrieval`. Chunking
+declares the turn shape it needs rather than importing the corpus model.
+
+`src/test_layering.py` walks the import graph and fails on a violation. Add a layer to
+`ALLOWED` there before introducing it.
+
+## Retrieval
+
+Chunks pack consecutive turns toward two hundred words and split a longer turn at
+sentence boundaries, because a turn is the wrong unit on its own: a quarter of real turns
+are under twenty words and a tenth run past three hundred. Chunks never cross episodes,
+and each records the range of turns it covers so a passage resolves back to its speaker
+and position.
+
+Every strategy returns `Evidence`, so results from different strategies can be compared
+and cited the same way, and they share chunk identifiers so a citation resolves the same
+whichever strategy found it.
+
+Two lexical strategies exist on purpose. Postgres full-text ranking has no term-rarity
+weighting; OpenSearch gives BM25, which does. Keeping both lets the evaluation harness
+measure the difference rather than assume it. The search index is a projection of the
+chunk table and can be dropped and rebuilt at any time.
+
+Full-text queries match any of a question's terms, not all of them. Requiring every term
+makes a natural-language question unmatchable, which reads as a retrieval failure when it
+is really a query-construction bug. Ranked results break ties on identifier so that
+repeating a query returns the same order.
+
+Changing the chunking rules means changing `CHUNKER_VERSION` and re-chunking, since
+anything derived from a chunk is invalidated by new boundaries.
+
+## Retrieval evaluation
+
+The regression suite runs fixed queries against a corpus built from the committed
+transcript fixtures. It must never read the live archive: a suite whose corpus changes
+measures the corpus rather than the retriever, and a newly published episode would move
+the numbers while a green run meant nothing.
+
+Assertions name a phrase rather than a chunk identifier, so re-chunking may move
+boundaries but may not lose the passage.
+
+Floors are raised when a change earns it and never lowered to make a failing run pass. A
+floor nothing can fail is not a gate, which is why the suite also asserts that a known
+weakness still measures as one.
+
 ## Observability
 
 Honeycomb environments are deployment stages, and datasets are services. The environment

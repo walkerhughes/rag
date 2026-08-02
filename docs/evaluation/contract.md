@@ -90,6 +90,22 @@ Two invariants are not negotiable and do not get a threshold:
 2. A question the corpus cannot answer must produce an insufficient-evidence response.
    `stance-004` exists to catch fabricated dissent specifically.
 
+## Retrieval regression
+
+`retrieval_regression.jsonl` holds fixed queries run on every pull request against the two
+committed transcripts, guarding against silent loss of retrieval quality. It is a
+regression gate, not a measure of retrieval quality: ten queries over two episodes says
+nothing about recall on the real corpus.
+
+Measured on that frozen corpus:
+
+| | Recall@1 | Recall@3 | Recall@10 |
+| --- | --- | --- | --- |
+| Postgres full text | 0.40 | 0.90 | 1.00 |
+| BM25 | 0.90 | 0.90 | 1.00 |
+
+The gap at rank one is term-rarity weighting, which Postgres ranking does not have.
+
 ## Splits
 
 `dev` is for building. `heldout` is for release gates and never for prompt tuning. They

@@ -36,11 +36,25 @@ jobs:
           --health-interval 2s
           --health-timeout 3s
           --health-retries 30
+      opensearch:
+        image: opensearchproject/opensearch:2.19.0
+        env:
+          discovery.type: single-node
+          DISABLE_SECURITY_PLUGIN: "true"
+          OPENSEARCH_JAVA_OPTS: -Xms512m -Xmx512m
+        ports:
+          - 9200:9200
+        options: >-
+          --health-cmd "curl -sf http://localhost:9200/_cluster/health || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 30
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
       - run: uv sync
-      # Proves a clean database reaches head, and that the schema still matches the models.
+      # Proves a clean database reaches head, that the schema still matches the models,
+      # and that both lexical strategies return the same contract.
       - run: uv run pytest -m integration

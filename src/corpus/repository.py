@@ -1,5 +1,9 @@
 """Writing canonical corpus records.
 
+Owned by the corpus layer rather than by storage, so that storage holds the schema and
+nothing about where documents come from. Replacing the source means replacing this layer
+and the schema it writes to; nothing downstream of the database needs to know.
+
 Saving is idempotent at the logical-record level: re-saving an episode updates it in place
 and keeps the identifiers of segments that are still there, so anything derived from a
 segment can continue to reference it.
