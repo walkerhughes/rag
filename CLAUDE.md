@@ -107,6 +107,14 @@ Adding a question class means adding both development and held-out examples, or 
 Quality floors written before a capability was measured are provisional, and must be
 labelled as such. A floor that looks measured but is not is worse than no floor.
 
+## Commit messages
+
+Say what changed and why, in the imperative. Do not prefix a subject with a phase label,
+and do not reference issue numbers in the subject or the body. Pull request descriptions
+are where issues get linked, and they stay accurate as the roadmap moves.
+
+Do not add a co-author trailer.
+
 ## Pull requests
 
 Open pull requests as drafts. Do not merge without an explicit go-ahead.
