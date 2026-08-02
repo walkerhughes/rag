@@ -2,7 +2,11 @@
 
 from alembic import context
 
-from storage.postgres import Base, engine
+from storage.postgres import (
+    Base,
+    engine,
+    models,  # noqa: F401  imported so its tables register on Base
+)
 
 target_metadata = Base.metadata
 
