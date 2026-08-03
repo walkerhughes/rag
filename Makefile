@@ -1,4 +1,4 @@
-.PHONY: up down reset logs psql preview ingest reindex check test test-integration
+.PHONY: up down reset logs psql preview ingest reindex eval-retrieval check test test-integration
 
 # Starts Postgres, waits for it to pass its healthcheck, and migrates it to head.
 up:
@@ -34,6 +34,12 @@ ingest: up
 # Rebuilds chunks for every stored episode. Fetches nothing.
 reindex: up
 	PYTHONPATH=src uv run python -m apps.ingestion_worker.main --reindex
+
+# Scores the evaluation examples against every retrieval strategy and prints the report.
+# Measures whatever is ingested locally, which the report names. Pass SPLIT=heldout for
+# the release-gate examples, or K=3 for a single rank.
+eval-retrieval: up
+	PYTHONPATH=src uv run python -m apps.retrieval_eval.main $(if $(SPLIT),--split $(SPLIT),) $(if $(K),--k $(K),)
 
 # The same commands CI runs, in the same order.
 check:

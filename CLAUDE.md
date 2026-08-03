@@ -121,6 +121,17 @@ Floors are raised when a change earns it and never lowered to make a failing run
 floor nothing can fail is not a gate, which is why the suite also asserts that a known
 weakness still measures as one.
 
+`make eval-retrieval` is the report, and is not a gate. It scores precision and recall at
+k for every strategy over `docs/evaluation/examples.jsonl`, whose `expected_phrases` are
+the ground truth, and it measures whatever the local database holds rather than a frozen
+corpus, because ten queries over two episodes cannot rank two similar configurations. A
+report therefore names the corpus it measured, and a number quoted without that heading
+means nothing.
+
+Precision at k is bounded by how many passages an example annotates, so the report carries
+the ceiling and the attained fraction beside every precision figure. Quote all three or
+none: a bare precision reads as a retriever's failure when it is the dataset's shape.
+
 ## Observability
 
 Honeycomb environments are deployment stages, and datasets are services. The environment

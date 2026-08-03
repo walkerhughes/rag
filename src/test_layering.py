@@ -14,7 +14,7 @@ from pathlib import Path
 SOURCE = Path(__file__).parent
 APPS = SOURCE.parent / "apps"
 
-LAYERS = ("config", "observability", "storage", "corpus", "retrieval", "agent")
+LAYERS = ("config", "observability", "storage", "corpus", "retrieval", "agent", "evaluation")
 
 # What each layer is allowed to import. Anything absent from a layer's set is a violation.
 ALLOWED = {
@@ -27,6 +27,9 @@ ALLOWED = {
     "retrieval": {"config", "observability", "storage"},
     # Tools sit on retrieval's contract, never on a source.
     "agent": {"config", "observability", "storage", "retrieval"},
+    # Measurement calls retrieval and reads the example files. It touches no database of
+    # its own: the corpus it measured is described to it by the entry point.
+    "evaluation": {"config", "observability", "retrieval"},
 }
 
 
@@ -75,8 +78,15 @@ def test_ingestion_and_retrieval_never_import_each_other() -> None:
 def test_storage_holds_the_schema_and_nothing_above_it() -> None:
     for layer, path in modules():
         if layer == "storage":
-            reaching_up = imports_of(path) & {"corpus", "retrieval", "agent"}
+            reaching_up = imports_of(path) & {"corpus", "retrieval", "agent", "evaluation"}
             assert not reaching_up, f"{path.name} reaches up into {reaching_up}"
+
+
+def test_nothing_a_report_measures_can_see_the_report() -> None:
+    """A strategy that could tell it was being evaluated would not be measurable."""
+    for layer, path in modules():
+        if layer != "evaluation":
+            assert "evaluation" not in imports_of(path), f"{path.name} imports its own measurement"
 
 
 def test_entry_points_are_where_the_layers_meet() -> None:
