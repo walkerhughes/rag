@@ -20,7 +20,7 @@ jobs:
       - run: uv run mypy src apps
       - run: uv run pytest -m "not integration" --cov
 
-  migrations:
+  integration:
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -55,6 +55,7 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync
-      # Proves a clean database reaches head, that the schema still matches the models,
-      # and that both lexical strategies return the same contract.
+      # The suite that needs Postgres and OpenSearch: a clean database reaches head and
+      # still matches the models, chunking and ingestion persist, and both lexical
+      # strategies return the same contract.
       - run: uv run pytest -m integration
