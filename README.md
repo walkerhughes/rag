@@ -37,6 +37,7 @@ curl localhost:8000/health
 | `make preview` | Parse an episode without writing, to check it first. No database needed |
 | `make ingest` | Ingest recent episodes (`LIMIT=10`, or `SLUG=richard-sutton`) |
 | `make reindex` | Rebuild chunks and the search index, fetching nothing |
+| `make harbor-package` | Build the Harbor Hub dataset packages from the evaluation examples |
 | `make check` | Everything CI runs: format, lint, types, unit tests |
 | `make test-integration` | Tests that need the database |
 
@@ -69,12 +70,29 @@ already installed on your machine.
 apps/api/        HTTP entrypoint
 src/             capability modules, tests beside the code
   config.py        settings
+  evaluation.py    Harbor Hub packaging for the evaluation examples
   observability.py tracing
   retrieval/       chunking and search
   storage/         database and migrations
 docs/evaluation/ the question classes the system claims to answer
 infra/           Pulumi program for AWS
 ```
+
+## Evaluation datasets
+
+`docs/evaluation/examples.jsonl` is the source of truth. `make harbor-package` turns it
+into two Harbor Hub datasets, `retrieval-dev` and `retrieval-heldout`, under `dist/`,
+which is ignored: the packaging is generated so the examples are never maintained twice.
+
+```bash
+make harbor-package
+harbor run -p dist/harbor/retrieval-dev -a oracle    # check locally, no network
+harbor publish dist/harbor/retrieval-dev dist/harbor/retrieval-heldout --private
+```
+
+Publishing is manual and one-way. A version pushed to the hub is not unpublished by
+deleting a local file, so `make harbor-package` prints the publish command rather than
+running it.
 
 ## Deploying
 

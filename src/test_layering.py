@@ -14,7 +14,7 @@ from pathlib import Path
 SOURCE = Path(__file__).parent
 APPS = SOURCE.parent / "apps"
 
-LAYERS = ("config", "observability", "storage", "corpus", "retrieval", "agent")
+LAYERS = ("config", "observability", "storage", "corpus", "retrieval", "agent", "evaluation")
 
 # What each layer is allowed to import. Anything absent from a layer's set is a violation.
 ALLOWED = {
@@ -27,6 +27,9 @@ ALLOWED = {
     "retrieval": {"config", "observability", "storage"},
     # Tools sit on retrieval's contract, never on a source.
     "agent": {"config", "observability", "storage", "retrieval"},
+    # Packaging reads the contract files on disk and imports no layer, so it stays
+    # measurable against a system it does not depend on.
+    "evaluation": set(),
 }
 
 

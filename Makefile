@@ -1,4 +1,4 @@
-.PHONY: up down reset logs psql preview ingest reindex check test test-integration
+.PHONY: up down reset logs psql preview ingest reindex harbor-package check test test-integration
 
 # Starts Postgres, waits for it to pass its healthcheck, and migrates it to head.
 up:
@@ -15,6 +15,7 @@ reset:
 	$(MAKE) up
 
 LIMIT ?= 5
+HARBOR_DIR ?= dist/harbor
 
 logs:
 	docker compose logs -f postgres
@@ -34,6 +35,14 @@ ingest: up
 # Rebuilds chunks for every stored episode. Fetches nothing.
 reindex: up
 	PYTHONPATH=src uv run python -m apps.ingestion_worker.main --reindex
+
+# Regenerates the Harbor dataset packages under dist/ from docs/evaluation/examples.jsonl,
+# then has the harbor CLI recompute the task digests it pins. Publishing is manual, and the
+# command to do it is printed at the end. Needs the harbor CLI.
+harbor-package:
+	PYTHONPATH=src uv run python -m evaluation --out $(HARBOR_DIR) $(if $(ORG),--org $(ORG),)
+	harbor sync $(HARBOR_DIR)/retrieval-dev
+	harbor sync $(HARBOR_DIR)/retrieval-heldout
 
 # The same commands CI runs, in the same order.
 check:
