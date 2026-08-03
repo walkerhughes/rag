@@ -92,8 +92,8 @@ def _filters(
     return clauses
 
 
-def search_chunks(
-    search: OpenSearch,
+def search(
+    opensearch: OpenSearch,
     query: str,
     *,
     limit: int = DEFAULT_LIMIT,
@@ -121,7 +121,7 @@ def search_chunks(
             # Ties break on identifier, so repeating a query returns the same order.
             "sort": ["_score", {"_id": "asc"}],
         }
-        hits = search.search(index=INDEX, body=body)["hits"]["hits"]
+        hits = opensearch.search(index=INDEX, body=body)["hits"]["hits"]
 
         results = [
             Evidence(

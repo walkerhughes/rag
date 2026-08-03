@@ -1,7 +1,7 @@
 """Shared test fixtures for both src and apps."""
 
 from collections.abc import Callable, Iterator
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 import pytest
@@ -10,8 +10,11 @@ from alembic.config import Config
 from opensearchpy import OpenSearch
 from sqlalchemy.orm import Session
 
+from corpus import repository
 from corpus.ingestion.dwarkesh import client
+from corpus.models import Episode, TranscriptSegment
 from retrieval import bm25
+from retrieval.indexing import index_episode, project_to_search
 from storage.postgres import Base, engine
 
 REPO_ROOT = Path(__file__).parent
@@ -87,3 +90,67 @@ def search_index() -> OpenSearch:
     search = bm25.client()
     bm25.recreate_index(search)
     return search
+
+
+def build_episode(
+    session: Session,
+    source_id: str,
+    speaker: str,
+    published: date,
+    texts: list[str],
+) -> None:
+    """Stores one episode of alternating host and guest turns, and chunks it."""
+    run = repository.start_run(session, "test")
+    episode = Episode(
+        source_id=source_id,
+        title=source_id.replace("-", " ").title(),
+        url=f"https://example.com/{source_id}",
+        published_at=published,
+        segments=[
+            TranscriptSegment(
+                position=index,
+                speaker=speaker if index % 2 else "Dwarkesh Patel",
+                text=text,
+                start=timedelta(minutes=index),
+            )
+            for index, text in enumerate(texts)
+        ],
+    )
+    index_episode(session, repository.save_episode(session, run, episode))
+
+
+@pytest.fixture
+def corpus(session: Session) -> Session:
+    """Two chunked episodes, on subjects far enough apart that a query separates them."""
+    build_episode(
+        session,
+        "richard-sutton",
+        "Richard Sutton",
+        date(2025, 9, 26),
+        [
+            "Tell me about reinforcement learning.",
+            "Reinforcement learning is about reward and continual learning from experience.",
+            "And the weights?",
+            "In a continual learning setup the information goes into the weights.",
+        ],
+    )
+    build_episode(
+        session,
+        "ada-palmer",
+        "Ada Palmer",
+        date(2026, 3, 6),
+        [
+            "Tell me about the Renaissance.",
+            "The Renaissance was slower and stranger than the textbooks suggest.",
+            "And printing?",
+            "Gutenberg went broke because printing was a brutal business.",
+        ],
+    )
+    return session
+
+
+@pytest.fixture
+def indexed(corpus: Session, search_index: OpenSearch) -> OpenSearch:
+    """The same two episodes, projected into the search index."""
+    project_to_search(corpus, search_index, rebuild=True)
+    return search_index
