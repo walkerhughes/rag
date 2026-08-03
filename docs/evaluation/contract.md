@@ -13,7 +13,7 @@ baseline. Until then, no floor in this document is evidence that anything works.
 | `classes.toml` | Question classes, whether each is expected to need the graph, quality floors. Read with stdlib `tomllib`. |
 | `examples.jsonl` | Development and held-out examples, one JSON object per line. |
 | `episodes.toml` | The slugs whose transcripts parse and are stored. Committed data, so the contract test needs no database. |
-| `../../src/test_evaluation_contract.py` | Fails CI if an example drifts from a declared class, a class loses a split or falls below eight examples, or an example cites an episode not in `episodes.toml`. |
+| `../../src/test_evaluation_contract.py` | Fails CI if an example drifts from a declared class, repeats an id or a question, leaves a required field empty, cites an episode not in `episodes.toml`, carries phrases that overlap or pad, or shares a whole phrase set with another example; and if a class loses a split or falls below eight examples. |
 
 ## Corpus
 
@@ -123,9 +123,19 @@ differ clearly. It is not enough to resolve small differences, and it should kee
 Every example is answerable from a stored transcript. Each names the episodes it depends
 on, the speakers whose words support it, and, where the episode carries timestamps, an
 anchor that is the start of a real turn. Episodes without inline timestamps carry no
-anchor rather than a fabricated one. The CI test checks the referenced episodes against
-`episodes.toml` offline; the speaker and anchor claims were checked against the stored
-corpus when the examples were written.
+anchor rather than a fabricated one.
+
+`expected_phrases` is the retrieval ground truth: verbatim snippets of a stored turn.
+Checked against the ingested corpus of fourteen episodes and 1452 chunks, every phrase
+matches exactly one chunk, that chunk belongs to an episode the example names, the phrase
+sits inside a single turn taken by one of the speakers the example names, and a question
+spanning episodes carries one phrase per episode rather than two from the same one.
+
+The CI test checks the referenced episodes against `episodes.toml` and enforces the
+structural rules on the phrases, all offline. Matching a phrase against a transcript needs
+a database and happens outside CI, so a phrase whose typographic quotes were straightened
+passes the unit suite. Nothing offline can catch it: the transcripts themselves mix curly
+and straight apostrophes, so the character alone carries no signal.
 
 ## Non-goals
 
