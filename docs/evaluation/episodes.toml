@@ -1,0 +1,23 @@
+# Episodes whose pages parse into speaker turns and are stored in the corpus. Read with
+# stdlib tomllib.
+#
+# Committed rather than queried, so the contract test can reject an example citing an
+# episode nobody can retrieve without a database or the network. Add a slug here when its
+# transcript has been ingested, not when the episode is published.
+
+parsed = [
+  "sarah-paine-east-asia",
+  "sarah-paine-ww2",
+  "sergey-levine",
+  "richard-sutton",
+  "andrej-karpathy",
+  "sarah-paine-russo-chinese",
+  "ilya-sutskever-2",
+  "sarah-paine-cold-war",
+  "dario-amodei-2",
+  "ada-palmer",
+  "dylan-patel",
+  "terence-tao",
+  "ada-palmer-2",
+  "grant-sanderson-2",
+]
