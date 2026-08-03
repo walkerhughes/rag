@@ -53,7 +53,7 @@ explicit_package_bases = true
 pythonpath = ["src", "."]
 testpaths = ["src", "apps"]
 addopts = "--strict-markers --strict-config"
-markers = ["integration: requires external services (Postgres, Neo4j, network)"]
+markers = ["integration: requires external services (Postgres, OpenSearch, network)"]
 
 [tool.coverage.run]
 source = ["src"]
@@ -61,3 +61,6 @@ branch = true
 
 [tool.coverage.report]
 exclude_also = ["if TYPE_CHECKING:", "raise NotImplementedError"]
+# What the unit suite reaches today. Raise it when a change earns it; never lower it to
+# make a failing run pass.
+fail_under = 66
