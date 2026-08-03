@@ -5,10 +5,14 @@ import tomllib
 from pathlib import Path
 
 CONTRACT = Path(__file__).parent.parent / "docs" / "evaluation"
-REQUIRED = {"id", "split", "question_class", "question", "expected_evidence"}
+REQUIRED = {"id", "split", "question_class", "question", "expected_evidence", "expected_phrases"}
 
 # Below this, recall over a class is too coarse to distinguish two retrieval configurations.
 MINIMUM_PER_CLASS = 8
+
+# Shorter than this, a phrase matches passages the example never meant. Grounding a phrase
+# in the corpus needs a database and happens outside CI; this is the offline proxy.
+MINIMUM_PHRASE_CHARS = 25
 
 
 def load_classes() -> dict[str, dict[str, object]]:
@@ -33,6 +37,13 @@ def episodes_of(example: dict[str, object]) -> list[str]:
     slugs = example.get("expected_episodes", [])
     assert isinstance(slugs, list), f"{example['id']} has a non-list expected_episodes"
     return [str(slug) for slug in slugs]
+
+
+def phrases_of(example: dict[str, object]) -> list[str]:
+    """The verbatim transcript snippets a correct answer has to cite."""
+    phrases = example.get("expected_phrases")
+    assert isinstance(phrases, list), f"{example['id']} has a non-list expected_phrases"
+    return [str(phrase) for phrase in phrases]
 
 
 def test_every_example_matches_a_declared_class() -> None:
@@ -70,3 +81,26 @@ def test_every_referenced_episode_is_known_to_parse() -> None:
     for e in load_examples():
         unknown = sorted(set(episodes_of(e)) - parsed)
         assert not unknown, f"{e['id']} cites {unknown}, absent from episodes.toml"
+
+
+def test_every_example_carries_usable_phrases() -> None:
+    """Recall needs ground truth a harness can match, which prose evidence is not."""
+    for e in load_examples():
+        phrases = phrases_of(e)
+        assert phrases, f"{e['id']} has no expected_phrases"
+        assert len(set(phrases)) == len(phrases), f"{e['id']} repeats a phrase"
+        for phrase in phrases:
+            assert phrase == phrase.strip(), f"{e['id']} has a phrase with edge whitespace"
+            assert len(phrase) >= MINIMUM_PHRASE_CHARS, f"{e['id']} has a short phrase: {phrase!r}"
+
+
+def test_phrase_count_matches_the_episodes_an_example_depends_on() -> None:
+    """Recall is measured over the set, so a question spanning episodes needs one per episode.
+
+    The single slack phrase covers an exchange where two speakers meet in one episode.
+    """
+    for e in load_examples():
+        episodes = len(set(episodes_of(e)))
+        phrases = len(phrases_of(e))
+        assert phrases >= episodes, f"{e['id']} names {episodes} episodes but {phrases} phrases"
+        assert phrases <= max(episodes, 1) + 1, f"{e['id']} has {phrases} phrases, padded"

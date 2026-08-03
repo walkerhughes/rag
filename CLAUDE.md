@@ -167,6 +167,14 @@ Run `pulumi preview` before `pulumi up`, and read the plan. Deployment is manual
 `docs/evaluation/` is machine-readable and guarded by `src/test_evaluation_contract.py`.
 Adding a question class means adding both development and held-out examples, or CI fails.
 
+An example's ground truth is `expected_phrases`, verbatim snippets of a stored turn, for the
+same reason the regression suite matches a phrase: re-chunking may move boundaries but may
+not lose the passage. `expected_evidence` stays prose for a human grader and names what a
+correct answer cites rather than how many passages it has or what order they come in. A
+question spanning episodes carries one phrase per episode, since recall is measured over the
+set. The contract test checks the shape offline; grounding a phrase in the corpus needs a
+database and happens outside CI.
+
 Quality floors written before a capability was measured are provisional, and must be
 labelled as such. A floor that looks measured but is not is worse than no floor.
 
