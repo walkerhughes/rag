@@ -37,6 +37,7 @@ curl localhost:8000/health
 | `make preview` | Parse an episode without writing, to check it first. No database needed |
 | `make ingest` | Ingest recent episodes (`LIMIT=10`, or `SLUG=richard-sutton`) |
 | `make reindex` | Rebuild chunks and the search index, fetching nothing |
+| `make eval-retrieval` | Score the examples against each retrieval strategy (`SPLIT=heldout`) |
 | `make check` | Everything CI runs: format, lint, types, unit tests |
 | `make test-integration` | Tests that need the database |
 
