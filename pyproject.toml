@@ -53,7 +53,7 @@ explicit_package_bases = true
 pythonpath = ["src", "."]
 testpaths = ["src", "apps"]
 addopts = "--strict-markers --strict-config"
-markers = ["integration: requires external services (Postgres, Neo4j, network)"]
+markers = ["integration: requires external services (Postgres, OpenSearch, network)"]
 
 [tool.coverage.run]
 source = ["src"]
