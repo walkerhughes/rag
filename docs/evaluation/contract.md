@@ -12,7 +12,8 @@ baseline. Until then, no floor in this document is evidence that anything works.
 | --- | --- |
 | `classes.toml` | Question classes, whether each is expected to need the graph, quality floors. Read with stdlib `tomllib`. |
 | `examples.jsonl` | Development and held-out examples, one JSON object per line. |
-| `../../src/test_evaluation_contract.py` | Fails CI if an example drifts from a declared class or a class loses a split. |
+| `episodes.toml` | The slugs whose transcripts parse and are stored. Committed data, so the contract test needs no database. |
+| `../../src/test_evaluation_contract.py` | Fails CI if an example drifts from a declared class, a class loses a split or falls below eight examples, or an example cites an episode not in `episodes.toml`. |
 
 ## Corpus
 
@@ -50,12 +51,14 @@ podcast type, which carry no dialogue at all, and episodes from 2021 to 2023 who
 use an older layout this parser does not read. Both are quarantined rather than stored
 empty or partial.
 
-Every episode the examples below depend on parses cleanly, extracting between 92 and 97
-percent of the published word count, the remainder being sponsor and introduction copy.
+The episodes the examples depend on are exactly the slugs in `episodes.toml`, each of
+which is ingested and parses into speaker turns. Across the episodes measured, the parser
+extracts between 92 and 97 percent of the published word count, the remainder being
+sponsor and introduction copy.
 
 Four episodes parse into plausible turns but recover only 28 to 60 percent of their
-words. They are usable but incomplete, and they are not among the episodes the examples
-depend on.
+words. They are usable but incomplete. A slug earns a place in `episodes.toml` by having
+been ingested, which is not by itself a claim about how much of it was recovered.
 
 ## Question classes
 
@@ -111,8 +114,18 @@ The gap at rank one is term-rarity weighting, which Postgres ranking does not ha
 `dev` is for building. `heldout` is for release gates and never for prompt tuning. They
 are separated by the `split` field, and the CI test asserts every class has both.
 
-Twenty-four examples is a starting contract, not a finished dataset. It is enough to
-detect a broken class and not enough to rank two similar configurations. #9 grows it.
+Fifty examples, twenty-five in each split, at least eight in every class. Eight is the
+floor the CI test enforces: below it, recall over a class takes so few values that no
+number in `classes.toml` is measurable and no run can separate two similar retrieval
+configurations. Fifty is enough to detect a broken class and to rank configurations that
+differ clearly. It is not enough to resolve small differences, and it should keep growing.
+
+Every example is answerable from a stored transcript. Each names the episodes it depends
+on, the speakers whose words support it, and, where the episode carries timestamps, an
+anchor that is the start of a real turn. Episodes without inline timestamps carry no
+anchor rather than a fabricated one. The CI test checks the referenced episodes against
+`episodes.toml` offline; the speaker and anchor claims were checked against the stored
+corpus when the examples were written.
 
 ## Non-goals
 

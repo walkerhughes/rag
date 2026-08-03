@@ -7,6 +7,9 @@ from pathlib import Path
 CONTRACT = Path(__file__).parent.parent / "docs" / "evaluation"
 REQUIRED = {"id", "split", "question_class", "question", "expected_evidence"}
 
+# Below this, recall over a class is too coarse to distinguish two retrieval configurations.
+MINIMUM_PER_CLASS = 8
+
 
 def load_classes() -> dict[str, dict[str, object]]:
     with (CONTRACT / "classes.toml").open("rb") as f:
@@ -14,9 +17,22 @@ def load_classes() -> dict[str, dict[str, object]]:
     return classes
 
 
+def load_parsed_episodes() -> set[str]:
+    with (CONTRACT / "episodes.toml").open("rb") as f:
+        parsed: list[str] = tomllib.load(f)["parsed"]
+    return set(parsed)
+
+
 def load_examples() -> list[dict[str, object]]:
     text = (CONTRACT / "examples.jsonl").read_text()
     return [json.loads(line) for line in text.splitlines() if line.strip()]
+
+
+def episodes_of(example: dict[str, object]) -> list[str]:
+    """The slugs an example depends on. Absent or empty for a deliberately unanchored one."""
+    slugs = example.get("expected_episodes", [])
+    assert isinstance(slugs, list), f"{example['id']} has a non-list expected_episodes"
+    return [str(slug) for slug in slugs]
 
 
 def test_every_example_matches_a_declared_class() -> None:
@@ -38,3 +54,19 @@ def test_every_class_has_both_splits() -> None:
     for name in load_classes():
         splits = {e["split"] for e in examples if e["question_class"] == name}
         assert splits == {"dev", "heldout"}, f"{name} has only {splits or 'no examples'}"
+
+
+def test_every_class_has_enough_examples() -> None:
+    """A class thin enough that recall can only be 0, 0.5 or 1.0 measures nothing."""
+    examples = load_examples()
+    for name in load_classes():
+        count = sum(1 for e in examples if e["question_class"] == name)
+        assert count >= MINIMUM_PER_CLASS, f"{name} has {count}, below {MINIMUM_PER_CLASS}"
+
+
+def test_every_referenced_episode_is_known_to_parse() -> None:
+    """An example citing an unretrievable episode makes a dataset bug look like a regression."""
+    parsed = load_parsed_episodes()
+    for e in load_examples():
+        unknown = sorted(set(episodes_of(e)) - parsed)
+        assert not unknown, f"{e['id']} cites {unknown}, absent from episodes.toml"
