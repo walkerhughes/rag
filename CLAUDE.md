@@ -177,3 +177,10 @@ Do not add a co-author trailer.
 ## Pull requests
 
 Open pull requests as drafts. Do not merge without an explicit go-ahead.
+
+Squash merges append the pull request number to the subject, which puts an issue
+reference into history. Pass the subject explicitly to keep it out:
+
+```
+gh pr merge <n> --squash --delete-branch --subject "Add transcript chunking"
+```
