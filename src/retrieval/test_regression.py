@@ -11,8 +11,8 @@ is allowed to move boundaries but is not allowed to lose the passage.
 
 import json
 from datetime import date, timedelta
+from functools import partial
 from pathlib import Path
-from typing import Protocol
 
 import pytest
 from opensearchpy import OpenSearch
@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 from corpus import repository
 from corpus.ingestion.dwarkesh.parser import parse_transcript
 from corpus.models import Episode
-from retrieval import Evidence, bm25, lexical
+from retrieval import Evidence, Search, bm25, lexical
 from retrieval.indexing import index_episode, project_to_search
 
 pytestmark = pytest.mark.integration
@@ -39,10 +39,6 @@ FROZEN = {
 # badly broken, which is why three is here too. Raise a floor when a change earns it;
 # never lower one to make a failing run pass.
 RECALL_FLOORS = {3: 0.8, 10: 0.9}
-
-
-class Search(Protocol):
-    def __call__(self, query: str, *, limit: int) -> list[Evidence]: ...
 
 
 def cases() -> list[dict[str, str]]:
@@ -67,6 +63,19 @@ def frozen_corpus(session: Session, search_index: OpenSearch) -> OpenSearch:
     return search_index
 
 
+@pytest.fixture(params=[lexical.STRATEGY, bm25.STRATEGY])
+def strategy(
+    request: pytest.FixtureRequest, session: Session, frozen_corpus: OpenSearch
+) -> tuple[str, Search]:
+    """Each strategy in turn, bound to the frozen corpus."""
+    name: str = request.param
+    searches: dict[str, Search] = {
+        lexical.STRATEGY: partial(lexical.search, session),
+        bm25.STRATEGY: partial(bm25.search, frozen_corpus),
+    }
+    return name, searches[name]
+
+
 def found(results: list[Evidence], case: dict[str, str]) -> bool:
     return any(
         item.episode_source_id == case["expected_episode"]
@@ -83,29 +92,18 @@ def recall(strategy: Search, k: int) -> tuple[float, list[str]]:
     return 1 - len(misses) / len(cases()), misses
 
 
-def assert_no_regression(name: str, strategy: Search) -> None:
-    for k, floor in RECALL_FLOORS.items():
-        score, misses = recall(strategy, k)
-        assert score >= floor, (
-            f"{name} Recall@{k}={score:.2f} below {floor}, missed:\n  " + "\n  ".join(misses)
-        )
-
-
 def test_the_frozen_corpus_is_what_the_fixtures_describe(frozen_corpus: OpenSearch) -> None:
     """A corpus that silently changed would make every number below meaningless."""
     assert frozen_corpus.count(index=bm25.INDEX)["count"] > 100
 
 
-def test_postgres_recall_has_not_regressed(session: Session, frozen_corpus: OpenSearch) -> None:
-    assert_no_regression(
-        "postgres", lambda query, *, limit: lexical.search(session, query, limit=limit)
-    )
-
-
-def test_bm25_recall_has_not_regressed(frozen_corpus: OpenSearch) -> None:
-    assert_no_regression(
-        "bm25", lambda query, *, limit: bm25.search_chunks(frozen_corpus, query, limit=limit)
-    )
+def test_recall_has_not_regressed(strategy: tuple[str, Search]) -> None:
+    name, search = strategy
+    for k, floor in RECALL_FLOORS.items():
+        score, misses = recall(search, k)
+        assert score >= floor, (
+            f"{name} Recall@{k}={score:.2f} below {floor}, missed:\n  " + "\n  ".join(misses)
+        )
 
 
 def test_the_gate_can_actually_fire(session: Session, frozen_corpus: OpenSearch) -> None:
@@ -114,43 +112,32 @@ def test_the_gate_can_actually_fire(session: Session, frozen_corpus: OpenSearch)
     Postgres reaches only 0.40 at rank one against 0.90 for BM25, the term-rarity gap.
     If this ever passes, the floors are measuring nothing and need tightening.
     """
-    score, _ = recall(lambda query, *, limit: lexical.search(session, query, limit=limit), 1)
+    score, _ = recall(partial(lexical.search, session), 1)
     assert score < RECALL_FLOORS[3]
 
 
-def test_both_strategies_rank_an_exact_phrase_first(
-    session: Session, frozen_corpus: OpenSearch
-) -> None:
+def test_an_exact_phrase_ranks_first(strategy: tuple[str, Search]) -> None:
     """A distinctive quoted phrase is the easiest case there is; failing it means breakage."""
-    query = "In a continual learning setup the information goes into the weights"
-    for results in (
-        lexical.search(session, query, limit=3),
-        bm25.search_chunks(frozen_corpus, query, limit=3),
-    ):
-        assert results
-        assert results[0].episode_source_id == "richard-sutton"
+    _, search = strategy
+    results = search("In a continual learning setup the information goes into the weights", limit=3)
+    assert results
+    assert results[0].episode_source_id == "richard-sutton"
 
 
-def test_every_result_can_be_cited(session: Session, frozen_corpus: OpenSearch) -> None:
+def test_every_result_can_be_cited(strategy: tuple[str, Search]) -> None:
     """Retrieval that cannot be resolved back to a transcript position is unusable."""
-    for results in (
-        lexical.search(session, "continual learning reward", limit=10),
-        bm25.search_chunks(frozen_corpus, "continual learning reward", limit=10),
-    ):
-        assert results
-        for item in results:
-            assert item.episode_source_id
-            assert item.first_position <= item.last_position
-            assert item.speakers
-            assert item.start is None or isinstance(item.start, timedelta)
+    _, search = strategy
+    results = search("continual learning reward", limit=10)
+    assert results
+    for item in results:
+        assert item.episode_source_id
+        assert item.first_position <= item.last_position
+        assert item.speakers
+        assert item.start is None or isinstance(item.start, timedelta)
 
 
-def test_filters_do_not_leak_across_episodes(session: Session, frozen_corpus: OpenSearch) -> None:
-    for results in (
-        lexical.search(session, "learning mathematics", episodes=["grant-sanderson-2"], limit=10),
-        bm25.search_chunks(
-            frozen_corpus, "learning mathematics", episodes=["grant-sanderson-2"], limit=10
-        ),
-    ):
-        assert results
-        assert {item.episode_source_id for item in results} == {"grant-sanderson-2"}
+def test_filters_do_not_leak_across_episodes(strategy: tuple[str, Search]) -> None:
+    _, search = strategy
+    results = search("learning mathematics", episodes=["grant-sanderson-2"], limit=10)
+    assert results
+    assert {item.episode_source_id for item in results} == {"grant-sanderson-2"}

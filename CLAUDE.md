@@ -90,6 +90,10 @@ Every strategy returns `Evidence`, so results from different strategies can be c
 and cited the same way, and they share chunk identifiers so a citation resolves the same
 whichever strategy found it.
 
+That shared behaviour is asserted once, in `src/retrieval/test_contract.py`, and run
+against each strategy through a parametrised fixture. A new strategy joins that fixture
+and inherits the suite; only what is true of one strategy alone belongs in its own tests.
+
 Two lexical strategies exist on purpose. Postgres full-text ranking has no term-rarity
 weighting; OpenSearch gives BM25, which does. Keeping both lets the evaluation harness
 measure the difference rather than assume it. The search index is a projection of the
