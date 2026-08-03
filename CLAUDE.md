@@ -210,3 +210,15 @@ reference into history. Pass the subject explicitly to keep it out:
 ```
 gh pr merge <n> --squash --delete-branch --subject "Add transcript chunking"
 ```
+
+A pull request whose base is another branch closes itself when that base is deleted on
+merge, and reopening it does not restore the base. Retarget the child onto `main` before
+merging the parent.
+
+The squash then leaves the child carrying the parent's commit while `main` carries a
+squashed equivalent of it, so the two conflict across every file the parent touched.
+Replay the child's own commits onto `main` rather than resolving that by hand:
+
+```
+git rebase --onto origin/main <parent-tip> <child-branch>
+```
