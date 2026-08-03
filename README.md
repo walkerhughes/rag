@@ -20,7 +20,7 @@ See [#1](https://github.com/walkerhughes/rag/issues/1) for the roadmap and
 ```bash
 uv sync
 make up
-uv run uvicorn apps.api.main:app --reload
+PYTHONPATH=src uv run uvicorn apps.api.main:app --reload
 curl localhost:8000/health
 ```
 
