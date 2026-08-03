@@ -37,9 +37,9 @@ reindex: up
 
 # Scores the evaluation examples against every retrieval strategy and prints the report.
 # Measures whatever is ingested locally, which the report names. Pass SPLIT=heldout for
-# the release-gate examples, or K=3 for a single rank.
+# the release-gate examples.
 eval-retrieval: up
-	PYTHONPATH=src uv run python -m apps.retrieval_eval.main $(if $(SPLIT),--split $(SPLIT),) $(if $(K),--k $(K),)
+	PYTHONPATH=src uv run python -m apps.retrieval_eval.main $(if $(SPLIT),--split $(SPLIT),)
 
 # The same commands CI runs, in the same order.
 check:

@@ -73,6 +73,14 @@ def test_a_malformed_annotation_is_not_quietly_dropped(tmp_path: Path) -> None:
         load(path)
 
 
+def test_the_report_names_the_file_relative_to_the_repository(tmp_path: Path) -> None:
+    """An absolute path in a pasted report names a machine rather than a dataset."""
+    assert load(EXAMPLES).origin == "docs/evaluation/examples.jsonl"
+    outside = tmp_path / "examples.jsonl"
+    outside.write_text("")
+    assert load(outside).origin == str(outside)
+
+
 def test_the_committed_examples_load() -> None:
     """The dataset on disk stays readable, whether or not it is annotated yet."""
     dataset = load(EXAMPLES)

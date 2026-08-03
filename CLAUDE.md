@@ -132,6 +132,9 @@ Precision at k is bounded by how many passages an example annotates, so the repo
 the ceiling and the attained fraction beside every precision figure. Quote all three or
 none: a bare precision reads as a retriever's failure when it is the dataset's shape.
 
+Every cell is an unweighted mean over the examples, so a row's `attain` is the mean of the
+per-example ratios and will not equal that row's `precision` divided by its `ceiling`.
+
 ## Observability
 
 Honeycomb environments are deployment stages, and datasets are services. The environment

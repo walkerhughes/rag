@@ -10,16 +10,26 @@ annotation.
 """
 
 import json
-from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
-from evaluation import Example
-
 ROOT = Path(__file__).parents[2]
 EXAMPLES = ROOT / "docs/evaluation/examples.jsonl"
-PHRASES = "expected_phrases"
 SPLITS = ("dev", "heldout")
+
+
+@dataclass(frozen=True)
+class Example:
+    """One question and the verbatim phrases a correct retrieval must surface.
+
+    Ground truth is a phrase rather than a chunk identifier, so re-chunking is allowed to
+    move a boundary but is not allowed to lose the passage.
+    """
+
+    id: str
+    question_class: str
+    question: str
+    expected_phrases: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -39,20 +49,6 @@ class Dataset:
         return str(self.path)
 
 
-def _phrases(row: dict[str, object]) -> tuple[str, ...]:
-    raw = row.get(PHRASES) or []
-    if not isinstance(raw, list):
-        raise ValueError(f"{row['id']}: {PHRASES} is not a list")
-    return tuple(str(phrase) for phrase in raw)
-
-
-def _rows(path: Path) -> Iterable[dict[str, object]]:
-    for line in path.read_text().splitlines():
-        if line.strip():
-            row: dict[str, object] = json.loads(line)
-            yield row
-
-
 def load(path: Path = EXAMPLES, *, split: str | None = None) -> Dataset:
     """Every example in `split`, or in all splits when it is None.
 
@@ -63,10 +59,15 @@ def load(path: Path = EXAMPLES, *, split: str | None = None) -> Dataset:
         raise ValueError(f"unknown split {split!r}, expected one of {', '.join(SPLITS)}")
 
     examples, unannotated = [], []
-    for row in _rows(path):
+    for line in path.read_text().splitlines():
+        if not line.strip():
+            continue
+        row: dict[str, object] = json.loads(line)
         if split is not None and row.get("split") != split:
             continue
-        phrases = _phrases(row)
+        phrases = row.get("expected_phrases") or []
+        if not isinstance(phrases, list):
+            raise ValueError(f"{row['id']}: expected_phrases is not a list")
         identifier = str(row["id"])
         if not phrases:
             unannotated.append(identifier)
@@ -76,7 +77,7 @@ def load(path: Path = EXAMPLES, *, split: str | None = None) -> Dataset:
                 id=identifier,
                 question_class=str(row["question_class"]),
                 question=str(row["question"]),
-                expected_phrases=phrases,
+                expected_phrases=tuple(str(phrase) for phrase in phrases),
             )
         )
     return Dataset(

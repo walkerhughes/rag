@@ -16,13 +16,29 @@ recall column is directly comparable to the contract.
 import textwrap
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import date
+from statistics import fmean
 
-from evaluation import Corpus, Example
-from evaluation.dataset import Dataset
+from evaluation.dataset import Dataset, Example
 from evaluation.metrics import precision_at_k, precision_ceiling, recall_at_k
 from retrieval import Search
 
 DEFAULT_K = (1, 3, 5, 10)
+
+
+@dataclass(frozen=True)
+class Corpus:
+    """What a report measured, so a number is never mistaken for one taken elsewhere.
+
+    The entry point fills this in, because this layer reads no database of its own.
+    """
+
+    label: str
+    episodes: tuple[str, ...]
+    turns: int
+    chunks: int
+    chunker_versions: tuple[str, ...]
+    published: tuple[date, date] | None
 
 
 @dataclass(frozen=True)
@@ -49,8 +65,6 @@ def measure(
     ks: Sequence[int] = DEFAULT_K,
 ) -> list[Score]:
     """Scores every example under every strategy, at every k."""
-    if not ks:
-        raise ValueError("at least one k is needed")
     depth = max(ks)
 
     scores: list[Score] = []
@@ -75,10 +89,6 @@ def measure(
     return scores
 
 
-def _mean(values: Sequence[float]) -> float:
-    return sum(values) / len(values)
-
-
 HEADER = f"  {'strategy':<10}{'k':>3}{'recall':>10}{'precision':>11}{'ceiling':>9}{'attain':>8}"
 
 
@@ -90,10 +100,10 @@ def _table(scores: Sequence[Score]) -> list[str]:
             group = [s for s in scores if s.strategy == strategy and s.k == k]
             lines.append(
                 f"  {strategy:<10}{k:>3}"
-                f"{_mean([s.recall for s in group]):>10.2f}"
-                f"{_mean([s.precision for s in group]):>11.2f}"
-                f"{_mean([s.ceiling for s in group]):>9.2f}"
-                f"{_mean([s.attainment for s in group]):>8.2f}"
+                f"{fmean(s.recall for s in group):>10.2f}"
+                f"{fmean(s.precision for s in group):>11.2f}"
+                f"{fmean(s.ceiling for s in group):>9.2f}"
+                f"{fmean(s.attainment for s in group):>8.2f}"
             )
     return lines
 
@@ -103,7 +113,11 @@ Precision at rank k is bounded by the annotation: an example naming n phrases ca
 exceed min(n, k)/k however good the retriever is. `ceiling` is that bound and `attain` is
 the measured precision as a fraction of it, so `attain` rather than `precision` is the
 column to read when comparing one k against another. A phrase that occurs in more than
-one passage can carry `attain` past 1.00, which says the corpus repeats the phrase."""
+one passage can carry `attain` past 1.00, which says the corpus repeats the phrase.
+
+Every cell is an unweighted mean over the examples, so each question counts once whatever
+its annotation. `attain` is therefore the mean of the per-example ratios, and will not
+equal a row's own `precision` divided by its own `ceiling`."""
 
 
 def _wrapped(names: Sequence[str]) -> list[str]:

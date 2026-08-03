@@ -11,9 +11,8 @@ from pathlib import Path
 
 import pytest
 
-from evaluation import Corpus, Example
-from evaluation.dataset import Dataset
-from evaluation.harness import Score, measure, render
+from evaluation.dataset import Dataset, Example
+from evaluation.harness import Corpus, Score, measure, render
 from retrieval import Evidence, Search
 
 EXAMPLES = (
@@ -77,6 +76,20 @@ def test_scores_are_what_the_stubs_earn(searches: dict[str, Search]) -> None:
     assert scores[("useless", "hop-001", 10)].precision == 0.0
 
 
+def test_a_strategy_returning_less_than_k_is_still_scored_against_k() -> None:
+    """Returning one result, or none, is a weak answer rather than a small denominator."""
+
+    def thin(query: str, *, limit: int = 10, **_: object) -> list[Evidence]:
+        return [evidence("into the weights")]
+
+    def empty(query: str, *, limit: int = 10, **_: object) -> list[Evidence]:
+        return []
+
+    scores = {s.strategy: s for s in measure({"thin": thin, "empty": empty}, EXAMPLES[:1], (10,))}
+    assert (scores["thin"].recall, scores["thin"].precision) == (1.0, 0.1)
+    assert (scores["empty"].recall, scores["empty"].precision) == (0.0, 0.0)
+
+
 def test_a_deeper_k_is_queried_once_and_sliced() -> None:
     """One query per example per strategy, whatever the k values."""
     queried = []
@@ -89,8 +102,9 @@ def test_a_deeper_k_is_queried_once_and_sliced() -> None:
     assert queried == [10]
 
 
-def test_at_least_one_k_is_required(searches: dict[str, Search]) -> None:
-    with pytest.raises(ValueError, match="at least one k"):
+def test_measuring_at_no_k_at_all_is_refused(searches: dict[str, Search]) -> None:
+    """Not quietly defaulted: a depth nobody asked for would be scored and believed."""
+    with pytest.raises(ValueError):
         measure(searches, EXAMPLES, ())
 
 
@@ -127,6 +141,21 @@ def test_the_report_breaks_down_by_strategy_and_class(searches: dict[str, Search
     assert "  useless     1      0.00       0.00     1.00    0.00" in report
 
 
+def test_every_cell_is_an_unweighted_mean_over_the_examples() -> None:
+    """Two examples that disagree, so a mean is not a maximum, a minimum or a total.
+
+    `attain` is the mean of the per-example ratios, not the ratio of the means: the row
+    below prints 0.50 where its own precision over its own ceiling would give 0.33.
+    """
+    scores = [
+        Score("s", "found", "direct_retrieval", 10, recall=1.0, precision=0.1, ceiling=0.1),
+        Score("s", "missed", "direct_retrieval", 10, recall=0.0, precision=0.0, ceiling=0.2),
+    ]
+    report = render(CORPUS, dataset(), scores)
+    assert "  s          10      0.50       0.05     0.15    0.50" in report
+    assert "unweighted mean" in report
+
+
 def test_the_report_says_what_it_skipped() -> None:
     report = render(CORPUS, dataset(("stance-004",)), [])
     assert "skipped    1" in report
@@ -143,3 +172,15 @@ def test_the_report_explains_the_precision_ceiling(searches: dict[str, Search]) 
 def test_attainment_is_precision_over_what_the_annotation_allows() -> None:
     score = Score("s", "e", "c", 10, recall=1.0, precision=0.1, ceiling=0.2)
     assert score.attainment == 0.5
+
+
+def test_a_repeated_phrase_carries_attainment_past_full_marks() -> None:
+    """The wart the report names: the ceiling counts phrases, the corpus counts passages."""
+
+    def repeating(query: str, *, limit: int = 10, **_: object) -> list[Evidence]:
+        return [evidence("bitter lesson"), evidence("the bitter lesson, again")]
+
+    (score,) = measure({"repeating": repeating}, EXAMPLES[1:], (2,))
+    assert (score.precision, score.ceiling, score.attainment) == (1.0, 0.5, 2.0)
+    # Reported rather than clamped, because it is the corpus that repeats the phrase.
+    assert "    2.00" in render(CORPUS, dataset(), [score])

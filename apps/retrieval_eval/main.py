@@ -13,14 +13,12 @@ Honeycomb dataset would spend events on a local run.
 import argparse
 from collections.abc import Sequence
 from functools import partial
-from pathlib import Path
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from evaluation import Corpus
-from evaluation.dataset import EXAMPLES, load
-from evaluation.harness import DEFAULT_K, measure, render
+from evaluation.dataset import load
+from evaluation.harness import Corpus, measure, render
 from retrieval import Search, bm25, lexical
 from storage.postgres import models, session
 
@@ -63,22 +61,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         default="dev",
         help="which examples to score; held-out examples are for release gates",
     )
-    arguments.add_argument(
-        "--examples",
-        type=Path,
-        default=EXAMPLES,
-        help="an example file to score, for checking an annotation before committing it",
-    )
-    arguments.add_argument(
-        "--k",
-        type=int,
-        action="append",
-        help=f"a rank to score at; repeatable, defaults to {', '.join(map(str, DEFAULT_K))}",
-    )
     parsed = arguments.parse_args(argv)
-    ks = tuple(sorted(set(parsed.k))) if parsed.k else DEFAULT_K
 
-    dataset = load(parsed.examples, split=None if parsed.split == "all" else parsed.split)
+    dataset = load(split=None if parsed.split == "all" else parsed.split)
 
     with session() as active:
         corpus = fingerprint(active)
@@ -88,7 +73,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             lexical.STRATEGY: partial(lexical.search, active),
             bm25.STRATEGY: partial(bm25.search, bm25.client()),
         }
-        scores = measure(searches, dataset.examples, ks)
+        scores = measure(searches, dataset.examples)
 
     print(render(corpus, dataset, scores))
     # An unscorable dataset is a failure of the run, not a result of zero.
