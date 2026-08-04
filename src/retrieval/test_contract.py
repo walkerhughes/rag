@@ -9,11 +9,13 @@ from datetime import date
 from functools import partial
 
 import pytest
+from conftest import build_episode
 from opensearchpy import OpenSearch
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from retrieval import Search, bm25, lexical
+from retrieval.indexing import project_to_search
 from storage.postgres import models
 
 pytestmark = pytest.mark.integration
@@ -53,6 +55,58 @@ def test_repeating_a_query_returns_the_same_order(strategy: tuple[str, Search]) 
     first = search("learning", limit=5)
     second = search("learning", limit=5)
     assert [item.chunk_id for item in first] == [item.chunk_id for item in second]
+
+
+# Passages a query scores identically, differing only in a marker word. Each is long
+# enough to become a chunk of its own, so the ordering between them is decided entirely by
+# how a strategy breaks a tie.
+TIED_TURNS = [f"Continual learning is the subject here, {marker}. " * 20 for marker in "abcd"]
+
+
+def build_tied_episode(session: Session) -> None:
+    build_episode(session, "tied-scores", "A Guest", date(2025, 1, 1), TIED_TURNS)
+
+
+def test_ranking_survives_reingesting_the_same_transcripts(
+    session: Session, search_index: OpenSearch
+) -> None:
+    """Chunk identifiers are generated per ingest, so ranking must not depend on them.
+
+    A tie broken on an identifier reorders whenever the same transcripts are stored again,
+    which moves an evaluation score with nothing about retrieval changed.
+    """
+    build_tied_episode(session)
+    project_to_search(session, search_index, rebuild=True)
+
+    query = "continual learning"
+
+    def ranking() -> dict[str, list[str]]:
+        """What each strategy returns, as passages rather than as identifiers."""
+        return {
+            lexical.STRATEGY: [found.text for found in lexical.search(session, query)],
+            bm25.STRATEGY: [found.text for found in bm25.search(search_index, query)],
+        }
+
+    scores = [found.score for found in lexical.search(session, query)]
+    assert len(scores) > 1, "one passage cannot show how a tie is broken"
+    assert len(set(scores)) < len(scores), "without tied scores this test proves nothing"
+
+    before = ranking()
+    identifiers = set(session.execute(select(models.Chunk.id)).scalars())
+
+    # Deleted through this session rather than through clear_corpus, which runs on its own
+    # connection and so cannot see rows this transaction has not committed. Dropping the
+    # episode cascades to its chunks, so rebuilding writes fresh identifiers instead of
+    # upserting onto the existing ones.
+    session.execute(delete(models.Episode))
+    session.flush()
+    build_tied_episode(session)
+    project_to_search(session, search_index, rebuild=True)
+
+    assert identifiers.isdisjoint(set(session.execute(select(models.Chunk.id)).scalars())), (
+        "re-ingesting must produce fresh identifiers, or this test cannot fail"
+    )
+    assert ranking() == before
 
 
 def test_a_natural_language_question_still_matches(strategy: tuple[str, Search]) -> None:

@@ -75,8 +75,12 @@ def search(
             .where(models.Chunk.search.op("@@")(tsquery))
         )
         statement = _filtered(statement, episodes, speakers, published_after, published_before)
-        # Ties break on identifier, so the same query always returns the same order.
-        statement = statement.order_by(rank.desc(), models.Chunk.id).limit(limit)
+        # Ties break on where a passage sits, not on its identifier: identifiers are
+        # generated per ingest, so ranking on them changes when the same transcripts are
+        # ingested again. ts_rank_cd ties often, which makes this the common path.
+        statement = statement.order_by(
+            rank.desc(), models.Episode.source_id, models.Chunk.ordinal
+        ).limit(limit)
 
         results = [
             Evidence(

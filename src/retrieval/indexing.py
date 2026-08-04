@@ -59,6 +59,7 @@ def _document(chunk: models.Chunk, episode: models.Episode) -> dict[str, object]
         "speakers": list(chunk.speakers),
         "first_position": chunk.first_position,
         "last_position": chunk.last_position,
+        "ordinal": chunk.ordinal,
         # `is not None`, because a chunk starting at 00:00:00 is a zero timedelta, which
         # is falsy. Testing truthiness drops the timestamp of every episode's first chunk.
         "start_seconds": chunk.start.total_seconds() if chunk.start is not None else None,

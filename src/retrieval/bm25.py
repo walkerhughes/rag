@@ -37,6 +37,9 @@ MAPPING: dict[str, Any] = {
             "first_position": {"type": "integer"},
             "last_position": {"type": "integer"},
             "start_seconds": {"type": "float"},
+            # Where the chunk sits in its episode. Unique with the episode, and unchanged
+            # by re-ingestion, so it is what ties rank on.
+            "ordinal": {"type": "integer"},
         }
     },
 }
@@ -118,8 +121,10 @@ def search(
                     "filter": _filters(episodes, speakers, published_after, published_before),
                 }
             },
-            # Ties break on identifier, so repeating a query returns the same order.
-            "sort": ["_score", {"_id": "asc"}],
+            # Ties break on where a passage sits, not on its identifier: identifiers are
+            # generated per ingest, so ranking on them changes when the same transcripts
+            # are ingested again.
+            "sort": ["_score", {"episode_source_id": "asc"}, {"ordinal": "asc"}],
         }
         hits = opensearch.search(index=INDEX, body=body)["hits"]["hits"]
 
