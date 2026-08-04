@@ -145,9 +145,12 @@ def build_episode(
     index_episode(session, repository.save_episode(session, run, episode))
 
 
-@pytest.fixture
-def corpus(session: Session) -> Session:
-    """Two chunked episodes, on subjects far enough apart that a query separates them."""
+def build_two_episodes(session: Session) -> None:
+    """Two episodes on subjects far enough apart that a query separates them.
+
+    A function as well as a fixture, so a test can ingest the same transcripts a second
+    time and compare what retrieval does with them.
+    """
     build_episode(
         session,
         "richard-sutton",
@@ -172,6 +175,11 @@ def corpus(session: Session) -> Session:
             "Gutenberg went broke because printing was a brutal business.",
         ],
     )
+
+
+@pytest.fixture
+def corpus(session: Session) -> Session:
+    build_two_episodes(session)
     return session
 
 
