@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     # DSN carries a password, so it is masked like any other credential.
     opensearch_url: str = Field(default="http://localhost:9200", validation_alias="OPENSEARCH_URL")
 
+    # The chunk index. Tests point at their own so a run cannot leave the developer's
+    # index holding test documents while the database holds the real corpus.
+    search_index: str = Field(default="chunks", validation_alias="OPENSEARCH_INDEX")
+
     database_url: SecretStr = Field(
         default=SecretStr("postgresql+psycopg://rag:rag@localhost:5433/rag"),
         validation_alias="DATABASE_URL",

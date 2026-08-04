@@ -51,6 +51,12 @@ check:
 test:
 	uv run pytest -m "not integration"
 
+# Integration tests drop the schema and empty the corpus tables, so they run against a
+# database and a search index of their own. An ingested corpus survives the suite.
+TEST_DATABASE_URL ?= postgresql+psycopg://rag:rag@localhost:5433/rag_test
+TEST_SEARCH_INDEX ?= chunks_test
+
 # Needs the database, so it brings it up first.
 test-integration: up
-	uv run pytest -m integration
+	DATABASE_URL=$(TEST_DATABASE_URL) OPENSEARCH_INDEX=$(TEST_SEARCH_INDEX) \
+		uv run pytest -m integration

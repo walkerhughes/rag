@@ -1,0 +1,13 @@
+{
+  "id": "synth-001",
+  "episodes": [
+    "richard-sutton",
+    "andrej-karpathy",
+    "dario-amodei-2"
+  ],
+  "speakers": [
+    "Richard Sutton",
+    "Andrej Karpathy",
+    "Dario Amodei"
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "answer": "One passage per speaker stating their own position, with no attribution swapped between them.",
+  "episodes": [
+    "richard-sutton",
+    "andrej-karpathy"
+  ],
+  "speakers": [
+    "Richard Sutton",
+    "Andrej Karpathy"
+  ]
+}

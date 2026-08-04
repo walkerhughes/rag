@@ -8,8 +8,11 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from opensearchpy import OpenSearch
+from sqlalchemy import create_engine, text
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
+from config import settings
 from corpus import repository
 from corpus.ingestion.dwarkesh import client
 from corpus.models import Episode, TranscriptSegment
@@ -34,6 +37,29 @@ def alembic_config() -> Config:
     return Config(str(REPO_ROOT / "alembic.ini"))
 
 
+@pytest.fixture(scope="session")
+def database() -> None:
+    """Creates the database this run points at, when it does not exist yet.
+
+    Integration tests drop the schema and empty the corpus tables, so they must never run
+    against the database a developer has ingested into. `make test-integration` points
+    DATABASE_URL at a database of their own, and this creates it on first use.
+
+    Not autouse: the unit suite has no database and CI runs it without one.
+    """
+    url = make_url(settings.database_url.get_secret_value())
+    admin = create_engine(url.set(database="postgres"), isolation_level="AUTOCOMMIT")
+    try:
+        with admin.connect() as connection:
+            exists = connection.execute(
+                text("SELECT 1 FROM pg_database WHERE datname = :name"), {"name": url.database}
+            ).scalar()
+            if not exists:
+                connection.execute(text(f'CREATE DATABASE "{url.database}"'))
+    finally:
+        admin.dispose()
+
+
 def clear_corpus() -> None:
     with Session(engine) as cleanup:
         for table in CORPUS_TABLES:
@@ -42,7 +68,7 @@ def clear_corpus() -> None:
 
 
 @pytest.fixture
-def session() -> Iterator[Session]:
+def session(database: None) -> Iterator[Session]:
     """An empty corpus before and after.
 
     Clearing beforehand matters because a real ingestion run, or a previous test, may have
@@ -85,7 +111,7 @@ def offline(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture
-def search_index() -> OpenSearch:
+def search_index(database: None) -> OpenSearch:
     """An empty search index, rebuilt from scratch so tests never inherit documents."""
     search = bm25.client()
     bm25.recreate_index(search)

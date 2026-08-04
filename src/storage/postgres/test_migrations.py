@@ -13,7 +13,7 @@ pytestmark = pytest.mark.integration
 
 
 @pytest.fixture
-def empty_database() -> Config:
+def empty_database(database: None) -> Config:
     """Drops and recreates the schema, so every test starts from nothing."""
     with engine.begin() as connection:
         connection.execute(text("DROP SCHEMA public CASCADE"))

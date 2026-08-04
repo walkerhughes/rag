@@ -20,7 +20,7 @@ from observability import tracer
 from retrieval import Evidence
 
 STRATEGY = "bm25"
-INDEX = "chunks"
+INDEX = settings.search_index
 DEFAULT_LIMIT = 10
 
 # `english` stems and drops stopwords, matching what Postgres does to its search vector,
