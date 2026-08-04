@@ -1,0 +1,13 @@
+{
+  "answer": "At least two distinct explanations from different episodes, each attributed to the speaker who gave it.",
+  "episodes": [
+    "richard-sutton",
+    "andrej-karpathy",
+    "dario-amodei-2"
+  ],
+  "speakers": [
+    "Richard Sutton",
+    "Andrej Karpathy",
+    "Dario Amodei"
+  ]
+}

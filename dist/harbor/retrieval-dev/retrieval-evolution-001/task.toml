@@ -1,0 +1,24 @@
+schema_version = "1.3"
+
+[task]
+name = "walkerhughes/retrieval-evolution-001"
+description = "How did the framing of continual learning change across AI episodes between September 2025 and February 2026?"
+authors = []
+keywords = ["dwarkesh", "retrieval", "topic_evolution", "dev"]
+
+# Where this task came from, so a hub result resolves back to the example.
+[metadata]
+category = "retrieval"
+example_id = "evolution-001"
+split = "dev"
+question_class = "topic_evolution"
+topics = ["continual_learning"]
+
+[agent]
+timeout_sec = 600.0
+
+[verifier]
+timeout_sec = 120.0
+
+[environment]
+build_timeout_sec = 600.0

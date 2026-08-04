@@ -1,0 +1,9 @@
+{
+  "answer": "Sutton's turn stating that in a continual learning setup the information goes into the weights rather than the context window.",
+  "episodes": [
+    "richard-sutton"
+  ],
+  "speakers": [
+    "Richard Sutton"
+  ]
+}

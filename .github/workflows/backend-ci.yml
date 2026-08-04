@@ -59,3 +59,6 @@ jobs:
       # still matches the models, chunking and ingestion persist, and both lexical
       # strategies return the same contract.
       - run: uv run pytest -m integration
+        env:
+          DATABASE_URL: postgresql+psycopg://rag:rag@localhost:5433/rag_test
+          OPENSEARCH_INDEX: chunks_test

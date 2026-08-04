@@ -1,0 +1,13 @@
+{
+  "answer": "Positions from at least two guests, each cited to its own episode.",
+  "episodes": [
+    "ilya-sutskever-2",
+    "andrej-karpathy",
+    "dario-amodei-2"
+  ],
+  "speakers": [
+    "Ilya Sutskever",
+    "Andrej Karpathy",
+    "Dario Amodei"
+  ]
+}
